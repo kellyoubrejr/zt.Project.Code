@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/VS-github/ERP/Zitn_DBSQD_Audit_To_PRD_FeedMtrl_Operation_Plugin/**)",
+      "Read(//c/Users/Administrator/source/repos/Zitn_RecevieBill_EntryButton_GetLot_Plugin/**)",
+      "Read(//c/Users/Administrator/AppData/Local/Temp/**)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\image_*\")",
+      "Bash(cmd /c \"dir /s /b C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\image_*\")",
+      "Bash(dir /s /b \"%TEMP%\\\\image_*\")",
+      "Bash(dir /s /b \"%TMP%\\\\image_*\")",
+      "Read(//c/Users/Administrator/AppData/**)",
+      "WebFetch(domain:open.sf-express.com)",
+      "WebSearch",
+      "Read(//e//**)"
+    ]
+  }
+}
