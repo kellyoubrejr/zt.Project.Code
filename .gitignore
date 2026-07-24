@@ -1,0 +1,23 @@
+﻿# Visual Studio 本地设置
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# 编译输出
+bin/
+obj/
+Debug/
+Release/
+*.dll
+*.exe
+*.pdb
+
+# 日志文件
+*.log
+*.tmp
+
+# 系统文件
+Thumbs.db
+Desktop.ini
