@@ -1,17 +1,17 @@
-using Kingdee.BOS.Core;
+﻿using Kingdee.BOS;
+using Kingdee.BOS.Contracts;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.ServiceHelper;
+using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.plugin.SFForm;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Kingdee.BOS;
-using Kingdee.BOS.Contracts;
-using Kingdee.BOS.Util;
 
-namespace Kingdee.Zitn.Project.Code.plugin.SFForm
+namespace Kingdee.Zitn.Project.Code.Schedule
 {
     /// <summary>
     /// 【定时任务】顺丰物流轨迹同步
@@ -29,14 +29,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFForm
     /// - 可在 K3 Cloud 任务计划中设置运行间隔
     /// </summary>
     [Description("【定时任务】顺丰物流轨迹同步"), HotUpdate]
-    public class SFRouteSyncSchedule : IScheduleService
+    public class SFRouteSync : IScheduleService
     {
         private static readonly CustomLog.LogWriter _log = CustomLog.For("顺丰路由同步");
 
         /// <summary>
         /// 定时任务入口，由 K3 Cloud 调度框架调用
         /// </summary>
-        public void Run(Context ctx, Schedule schedule)
+        public void Run(Context ctx, BOS.Core.Schedule schedule)
         {
             _log.Section("路由同步定时任务开始");
 
@@ -215,5 +215,6 @@ WHERE FID = {fid}");
 
             return new SFExpressClient(partnerID, checkWord, apiUrl, timeoutMs: 15000, logger: _log);
         }
+
     }
 }

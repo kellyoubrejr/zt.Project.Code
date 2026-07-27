@@ -127,10 +127,14 @@
     <Compile Include="Interface\K3Cloud.ErpToMes.WebApi\SyncMoOrderService.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushOutStock.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushTransferDirect.cs" />
+    <Compile Include="plugin\FeedMtrl\FeedMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\MoRpt\MoRptSaveUpdateMaterialXLHInfo.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockEntryButtonSuanBox.cs" />
+    <Compile Include="plugin\OutStock\OutStockJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\PickMtrl\PickMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\QC\QC_SaveOrSubmit_UpdateAutoFlag.cs" />
+    <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSuanBox.cs" />
     <Compile Include="plugin\TransferDirect\TransferDitectEntryButtonSuanBox.cs" />
     <Compile Include="plugin\SFForm\SFApiAduit.cs" />
@@ -138,8 +142,9 @@
     <Compile Include="plugin\SFForm\SFApiUnAudit.cs" />
     <Compile Include="plugin\SFForm\SFRouteService.cs" />
     <Compile Include="plugin\SFForm\SFBillPlugin.cs" />
-    <Compile Include="plugin\SFForm\SFRouteSyncSchedule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Schedule\JiaZhiFenLei.cs" />
+    <Compile Include="Schedule\SFRouteSync.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
