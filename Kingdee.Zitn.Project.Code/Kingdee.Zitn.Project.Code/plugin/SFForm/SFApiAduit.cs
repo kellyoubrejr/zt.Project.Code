@@ -1,3 +1,4 @@
+using Kingdee.BOS.Core.DynamicForm;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
@@ -23,9 +24,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFForm
     {
         private static readonly CustomLog.LogWriter _log = CustomLog.For("顺丰面单审核");
 
+        /// <summary>
+        /// 在执行操作事务前调用，用于处理审核开始前的逻辑
+        /// </summary>
+        /// <param name="e">BeforeExecuteOperationTransaction 事件参数，包含数据实体等信息</param>
         public override void BeforeExecuteOperationTransaction(BeforeExecuteOperationTransaction e)
         {
-            base.BeforeExecuteOperationTransaction(e);
+            base.BeforeExecuteOperationTransaction(e); // 调用基类的BeforeExecuteOperationTransaction方法
 
             var ids = string.Join(",",
                 e.DataEntitys.Select(o => o[0]?.ToString() ?? "?"));
