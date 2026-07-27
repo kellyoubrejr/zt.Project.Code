@@ -21,3 +21,6 @@ Release/
 # 系统文件
 Thumbs.db
 Desktop.ini
+
+# VS Code 本地历史记录（新增）
+.history/
