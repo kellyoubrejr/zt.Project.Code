@@ -25,7 +25,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>D:\Program Files %28x86%29\Kingdee\K3Cloud\WebSite\Bin\</OutputPath>
     <DefineConstants>PROD</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -133,6 +133,7 @@
     <Compile Include="plugin\OutStock\OutStockEntryButtonSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\PickMtrl\PickMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\QC\QCAuditUpsertDateTime.cs" />
     <Compile Include="plugin\QC\QC_SaveOrSubmit_UpdateAutoFlag.cs" />
     <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSuanBox.cs" />
