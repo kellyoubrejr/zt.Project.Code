@@ -71,7 +71,6 @@ namespace Kingdee.Zitn.Project.Code.conf
             return new LogWriter(tag);
         }
 
-        // ? 对外暴露
         public class LogWriter
         {
             private readonly string _tag;
