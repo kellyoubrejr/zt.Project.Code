@@ -11,7 +11,7 @@ using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
 {
-    [Description("【审核服务】--直接调拨单审核根据发货包装清单自动计算箱次"), HotUpdate]
+    [Description("【直接调拨审核服务】--直接调拨单审核根据发货包装清单自动计算箱次"), HotUpdate]
     public class TransferDirectAuditSuanBox : AbstractOperationServicePlugIn
     {
         public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
