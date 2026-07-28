@@ -7,7 +7,7 @@ using System.ComponentModel;
 
 namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 {
-    [Description("【服务插件】：出库申请单提交时，根据对应物料的采购价格更新价值分类字段")]
+    [Description("【出库申请单服务】：出库申请单提交时，根据对应物料的采购价格更新价值分类字段")]
     [Kingdee.BOS.Util.HotUpdate]
     public class OutStockJiaZhiFenLeiUpsert : AbstractOperationServicePlugIn
     {
