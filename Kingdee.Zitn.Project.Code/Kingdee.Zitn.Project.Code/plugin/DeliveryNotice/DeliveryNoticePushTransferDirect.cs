@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.plugin.DeliveryNotice
 {
-    [Description("【下推服务】--[样品/意向]发货通知单审核根据标识自动下推直接调拨单"), HotUpdate]
+    [Description("【发货通知单下推服务】--[样品/意向]发货通知单审核根据标识自动下推直接调拨单"), HotUpdate]
     public class DeliveryNoticePushTransferDirect : AbstractOperationServicePlugIn
     {
         public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
