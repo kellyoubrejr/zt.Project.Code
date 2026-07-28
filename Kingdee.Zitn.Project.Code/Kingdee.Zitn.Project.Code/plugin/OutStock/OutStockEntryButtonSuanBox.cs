@@ -9,7 +9,7 @@ using System.ComponentModel;
 
 namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 {
-    [Description("【单据插件-分录按钮】销售出库单分录按钮实现重新算箱"), HotUpdate]
+    [Description("【销售出库单据插件-分录按钮】销售出库单分录按钮实现重新算箱"), HotUpdate]
     public class OutStockEntryButtonSuanBox : AbstractBillPlugIn
     {
         public override void AfterEntryBarItemClick(AfterBarItemClickEventArgs e)
