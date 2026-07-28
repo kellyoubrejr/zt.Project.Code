@@ -11,7 +11,7 @@ using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 {
-    [Description("【审核服务】--销售出库单审核根据发货包装清单自动计算箱次"), HotUpdate]
+    [Description("【销售出库审核服务】--销售出库单审核根据发货包装清单自动计算箱次"), HotUpdate]
     public class OutStockAuditSuanBox : AbstractOperationServicePlugIn
     {
         public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
