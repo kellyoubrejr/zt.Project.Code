@@ -24,7 +24,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
         /// 获取生产订单信息
         /// </summary>
         /// <param name="queryDate">查询日期</param>
-        /// <param name="onlyStart">是否只查询计划状态 1-7 0-所有</param>
+        /// <param name="onlyStart">是否只查询计划状态 1-7特定状态 0-所有</param>
         /// <param name="fseq">生产订单行号</param>
         /// <returns></returns>
         public object GetTodoInfo(DateTime queryDate, int onlyStart)
