@@ -115,8 +115,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Interface\K3Cloud.ErpToBpm.WebApi\" />
-    <Folder Include="Interface\K3Cloud.ErpToPlm.WebApi\" />
+    <Folder Include="Interface\ToBPM\" />
+    <Folder Include="Interface\ToOther\" />
+    <Folder Include="Interface\ToPLM\" />
     <Folder Include="libs\" />
     <Folder Include="models\" />
   </ItemGroup>
@@ -124,7 +125,7 @@
     <Compile Include="conf\CustomLog.cs" />
     <Compile Include="conf\ErpLogin.cs" />
     <Compile Include="conf\SFConfig.cs" />
-    <Compile Include="Interface\K3Cloud.ErpToMes.WebApi\SyncMoOrderService.cs" />
+    <Compile Include="Interface\ToMES\MesService.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushOutStock.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushTransferDirect.cs" />
     <Compile Include="plugin\FeedMtrl\FeedMtrlJiaZhiFenLeiUpsert.cs" />
