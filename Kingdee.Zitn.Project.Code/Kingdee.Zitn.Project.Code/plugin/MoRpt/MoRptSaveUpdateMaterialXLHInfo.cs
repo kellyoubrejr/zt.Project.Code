@@ -8,7 +8,7 @@ using System.ComponentModel;
 
 namespace Kingdee.Zitn.Project.Code.plugin.MoRpt
 {
-    [HotUpdate, Description("生产汇报保存更新物料序列号主档信息")]
+    [HotUpdate, Description("【生产汇报保存服务】更新物料序列号主档信息")]
     public class MoRptSaveUpdateMaterialXLHInfo : AbstractOperationServicePlugIn
     {
         public override void OnPreparePropertys(PreparePropertysEventArgs e)
