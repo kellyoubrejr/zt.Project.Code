@@ -6,7 +6,7 @@ using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 namespace Kingdee.Zitn.Project.Code.plugin.ReturnMtrl
 {
-    [Description("【服务插件】：生产退料单提交时，根据对应物料的采购价格更新价值分类字段")]
+    [Description("【生产退料提交服务】：生产退料单提交时，根据对应物料的采购价格更新价值分类字段")]
     [Kingdee.BOS.Util.HotUpdate]
     public class ReturnMtrlJiaZhiFenLeiUpsert : AbstractOperationServicePlugIn
     {
