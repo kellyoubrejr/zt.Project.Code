@@ -11,7 +11,7 @@ using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.plugin.QC
 {
-    [Description("【保存/提交服务】--检验单更新是否自动审核标志"), HotUpdate]
+    [Description("【检验单保存/提交服务】--检验单更新是否自动审核标志"), HotUpdate]
     public class QC_SaveOrSubmit_UpdateAutoFlag : AbstractOperationServicePlugIn
     {
         public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
