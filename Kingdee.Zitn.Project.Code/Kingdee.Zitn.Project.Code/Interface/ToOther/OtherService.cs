@@ -12,5 +12,6 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToOther
             : base(context)
         {
         }
+
     }
 }
