@@ -7,7 +7,7 @@ using Kingdee.BOS.App.Data;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PickMtrl
 {
-    [Description("【服务插件】：生产领料单提交时，根据对应物料的采购价格更新价值分类字段")]
+    [Description("【生产领料服务】：生产领料单提交时，根据对应物料的采购价格更新价值分类字段")]
     [Kingdee.BOS.Util.HotUpdate]
     public class PickMtrlJiaZhiFenLeiUpsert : AbstractOperationServicePlugIn
     {
