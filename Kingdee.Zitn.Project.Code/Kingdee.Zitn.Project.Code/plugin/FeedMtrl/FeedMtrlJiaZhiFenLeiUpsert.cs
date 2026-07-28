@@ -7,7 +7,7 @@ using Kingdee.BOS.App.Data;
 
 namespace Kingdee.Zitn.Project.Code.plugin.FeedMtrl
 {
-    [Description("【服务插件】：生产补料单提交时，根据对应物料的采购价格更新价值分类字段")]
+    [Description("【补料单提交服务】：生产补料单提交时，根据对应物料的采购价格更新价值分类字段")]
     [Kingdee.BOS.Util.HotUpdate]
     public class FeedMtrlJiaZhiFenLeiUpsert : AbstractOperationServicePlugIn
     {
