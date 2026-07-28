@@ -9,7 +9,7 @@ using System.ComponentModel;
 
 namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
 {
-    [Description("【单据插件-分录按钮】直接调拨单分录按钮实现重新算箱"), HotUpdate]
+    [Description("【直接调拨单据插件-分录按钮】直接调拨单分录按钮实现重新算箱"), HotUpdate]
     public class TransferDitectEntryButtonSuanBox : AbstractBillPlugIn
     {
         public override void AfterEntryBarItemClick(AfterBarItemClickEventArgs e)
