@@ -2,6 +2,7 @@ using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
+using Kingdee.BOS.Orm.Metadata.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
 using System;
@@ -14,47 +15,61 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
     [Description("【销售出库审核服务】--销售出库单审核根据发货包装清单自动计算箱次"), HotUpdate]
     public class OutStockAuditSuanBox : AbstractOperationServicePlugIn
     {
-        public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
+        public override void OnPreparePropertys(PreparePropertysEventArgs e)
         {
-            base.AfterExecuteOperationTransaction(e);
+            base.OnPreparePropertys(e);
+            e.FieldKeys.Add("FFHBZLB");
+            e.FieldKeys.Add("FFHBZGG");
+            e.FieldKeys.Add("FSCBZGG");
+            e.FieldKeys.Add("FFHBZSL");
+            e.FieldKeys.Add("FREALQTY");
+            e.FieldKeys.Add("FMaterialId");
+            e.FieldKeys.Add("FXC");
+        }
+
+        public override void BeginOperationTransaction(BeginOperationTransactionArgs e)
+        {
+            base.BeginOperationTransaction(e);
 
             var log = CustomLog.For("销售出库单");
             log.Section("自动计算箱次");
 
-            if (!this.OperationResult.IsSuccess)
+            var entryEntity = this.BusinessInfo.GetEntryEntity("FEntity");
+            if (entryEntity == null)
             {
-                log.WriteLog("操作未成功，跳过");
+                log.WriteLog("无法获取分录实体元数据，退出");
                 return;
             }
+            var entryPropName = entryEntity.DynamicObjectType.Name;
 
-            foreach (DynamicObject entity in e.DataEntitys)
+            var serialEntity = this.BusinessInfo.GetEntryEntity("FSerialSubEntity");
+            string serialPropName = null;
+            if (serialEntity != null)
+                serialPropName = serialEntity.DynamicObjectType.Name;
+
+            foreach (DynamicObject dataEntity in e.DataEntitys)
             {
-                var fid = Convert.ToInt64(entity["Id"]);
-                var billNo = Convert.ToString(entity["BillNo"]);
+                var fid = Convert.ToInt64(dataEntity["Id"]);
+                var billNo = Convert.ToString(dataEntity["BillNo"]);
+
+                if (!(dataEntity[entryPropName] is DynamicObjectCollection entries) || entries.Count == 0)
+                {
+                    log.WriteLog($"FID={fid} 无分录数据，跳过");
+                    continue;
+                }
 
                 try
                 {
                     log.WriteLog($"开始处理: {billNo}, FID={fid}");
 
-                    var entrySql = $@"/*dialect*/SELECT E.FENTRYID,  E.FMATERIALID,M.FNUMBER AS FMATERIALNO, E.FREALQTY
-FROM T_SAL_OUTSTOCK H
-JOIN T_SAL_OUTSTOCKENTRY E ON H.FID = E.FID
-JOIN T_BD_MATERIAL M ON E.FMATERIALID = M.FMATERIALID
-WHERE H.FID = {fid}";
-
-                    var entries = DBUtils.ExecuteDynamicObject(this.Context, entrySql);
-                    if (entries == null || entries.Count == 0)
-                    {
-                        log.WriteLog($"FID={fid} 无分录数据，跳过");
-                        continue;
-                    }
-
                     for (int i = 0; i < entries.Count; i++)
                     {
-                        var entryId = Convert.ToInt64(entries[i]["FENTRYID"]);
-                        var materialNo = Convert.ToString(entries[i]["FMATERIALNO"]);
-                        var materialId = Convert.ToInt64(entries[i]["FMATERIALID"]);
-                        var realQty = Convert.ToDecimal(entries[i]["FREALQTY"]);
+                        var entry = entries[i];
+                        var entryId = Convert.ToInt64(entry["Id"]);
+
+                        var materialId = Convert.ToInt64(entry["MaterialId_id"]);
+                        var materialNo = "";//Convert.ToString(materialObj?["Number"]);
+                        var realQty = Convert.ToDecimal(entry["REALQTY"]);
 
                         if (realQty <= 0)
                         {
@@ -62,11 +77,11 @@ WHERE H.FID = {fid}";
                             continue;
                         }
 
-                        
                         var specSql = $@"/*dialect*/SELECT FFHBZLB, FFHBZGG, FSCBZGG1, FFHBZSL1
-FROM ZMER_BZGGQD
-WHERE FCP = '{materialId}'
-ORDER BY FFHBZLB, FSCBZGG1, FCP";
+                                                    FROM ZMER_BZGGQD
+                                                    WHERE FCP = '{materialId}'
+                                                    AND FDOCUMENTSTATUS = 'C' AND FFORBIDSTATUS = 'A'
+                                                    ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                         var specs = DBUtils.ExecuteDynamicObject(this.Context, specSql);
                         if (specs == null || specs.Count == 0)
@@ -75,7 +90,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                             continue;
                         }
 
-                        var groupBoxOptions = new Dictionary<string, (decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
+                        var candidates = new List<(decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
                         for (int j = 0; j < specs.Count; j++)
                         {
                             var ffhbzlb = Convert.ToString(specs[j]["FFHBZLB"] ?? "");
@@ -85,22 +100,19 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                             if (ffhbzsl <= 0) continue;
 
-                            var groupKey = $"{ffhbzlb}|{fscbzgg}";
-                            if (!groupBoxOptions.ContainsKey(groupKey))
-                            {
-                                var boxes = (int)Math.Ceiling(realQty / ffhbzsl);
-                                groupBoxOptions[groupKey] = (ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg);
-                            }
+                            var boxes = (int)Math.Ceiling(realQty / ffhbzsl);
+                            candidates.Add((ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg));
                         }
 
-                        if (groupBoxOptions.Count == 0)
+                        if (candidates.Count == 0)
                         {
                             log.WriteLog($"  EntryID={entryId} 物料{materialNo} 无有效的包装规格，跳过");
                             continue;
                         }
 
-                        var best = groupBoxOptions.Values
-                            .OrderBy(o => o.BoxCount)
+                        var best = candidates
+                            .OrderBy(o => o.FFHBZLB == "2" ? 0 : 1)
+                            .ThenBy(o => o.BoxCount)
                             .ThenBy(o => realQty % o.PerBox == 0 ? 0 : 1)
                             .ThenByDescending(o => o.PerBox)
                             .First();
@@ -110,38 +122,32 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 数量={realQty}, 最优方案: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
 
-                        var updateEntrySql = $@"/*dialect*/UPDATE T_SAL_OUTSTOCKENTRY
-SET FFHBZLB = '{best.FFHBZLB}',
-    FFHBZGG = '{best.FFHBZGG}',
-    FSCBZGG = '{best.FSCBZGG}',
-    FFHBZSL = {bestPerBox}
-WHERE FENTRYID = {entryId}";
-                        DBUtils.Execute(this.Context, updateEntrySql);
-                        log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已回写单据体");
+                        entry["FFHBZLB"] = best.FFHBZLB;
+                        entry["FFHBZSL"] = bestPerBox;
+                        entry["FFHBZGG_Id"] = best.FFHBZGG;
+                        SetRefField(entry, "FFHBZGG", best.FFHBZGG);
+                        entry["FSCBZGG_Id"] = best.FSCBZGG;
+                        SetRefField(entry, "FSCBZGG", best.FSCBZGG);
 
-                        var serialSql = $@"/*dialect*/SELECT FSERIALID
-FROM T_SAL_OUTSTOCKSERIAL
-WHERE FENTRYID = {entryId}
-ORDER BY FSERIALID";
+                        log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已设置到单据体");
 
-                        var serials = DBUtils.ExecuteDynamicObject(this.Context, serialSql);
-                        if (serials == null || serials.Count == 0)
+                        if (!string.IsNullOrEmpty(serialPropName))
                         {
-                            log.WriteLog($"  EntryID={entryId} 无序列号数据，跳过");
-                            continue;
+                            var serials = entry[serialPropName] as DynamicObjectCollection;
+                            if (serials == null || serials.Count == 0)
+                            {
+                                log.WriteLog($"  EntryID={entryId} 无序列号数据，跳过");
+                                continue;
+                            }
+
+                            for (int k = 0; k < serials.Count; k++)
+                            {
+                                int boxNo = (int)(k / bestPerBox) + 1;
+                                serials[k]["FXC"] = boxNo;
+                            }
+
+                            log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {serials.Count}个序列号分{minBoxes}箱, 每箱{bestPerBox}个");
                         }
-
-                        for (int k = 0; k < serials.Count; k++)
-                        {
-                            long serialId = Convert.ToInt64(serials[k]["FSERIALID"]);
-                            int boxNo = (int)(k / bestPerBox) + 1;
-
-                            var updateSql = $@"/*dialect*/UPDATE T_SAL_OUTSTOCKSERIAL SET FXC = {boxNo}
-WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
-                            DBUtils.Execute(this.Context, updateSql);
-                        }
-
-                        log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {serials.Count}个序列号分{minBoxes}箱, 每箱{bestPerBox}个");
                     }
 
                     log.WriteLog($"{billNo} (FID={fid}) 箱次计算完成");
@@ -155,5 +161,21 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
 
             log.Section("箱次计算结束");
         }
+
+        private static void SetRefField(DynamicObject entry, string fieldName, string idValue)
+        {
+            var obj = entry[fieldName] as DynamicObject;
+            if (obj == null)
+            {
+                var dp = entry.DynamicObjectType.Properties[fieldName];
+                var pi = dp.GetType().GetProperty("DynamicComplexPropertyType");
+                var refType = pi?.GetValue(dp) as DynamicObjectType;
+                if (refType == null) return;
+                obj = new DynamicObject(refType);
+                entry[fieldName] = obj;
+            }
+            obj["Id"] = idValue;
+        }
+
     }
 }
