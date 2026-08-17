@@ -54,7 +54,7 @@ WHERE A.FID IN ({ids}) AND A.FISBY = 1 AND A.FBILLTYPEID = '193822715afc48aa9fa6
             var judgeDt = DBUtils.ExecuteDynamicObject(this.Context, judgeSql);
             if (judgeDt == null || judgeDt.Count == 0)
             {
-                log.WriteLog("没有FISBY=1的分录，跳过下推");
+                log.WriteLog("标准发货通知单没有FISBY=1的分录，跳过下推");
                 return;
             }
 
