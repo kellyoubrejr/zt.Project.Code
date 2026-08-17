@@ -65,6 +65,7 @@ WHERE H.FID = {fid}";
                         var specSql = $@"/*dialect*/SELECT FFHBZLB, FFHBZGG, FSCBZGG1, FFHBZSL1
 FROM ZMER_BZGGQD
 WHERE FCP = '{materialId}'
+AND FDOCUMENTSTATUS = 'C' AND FFORBIDSTATUS = 'A'
 ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                         var specs = DBUtils.ExecuteDynamicObject(this.Context, specSql);
@@ -102,6 +103,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                             .OrderBy(o => o.BoxCount)
                             .ThenBy(o => qty % o.PerBox == 0 ? 0 : 1)
                             .ThenByDescending(o => o.PerBox)
+                            .ThenBy(o => o.FFHBZLB == "2" ? 0 : 1)
                             .First();
 
                         int minBoxes = best.BoxCount;
