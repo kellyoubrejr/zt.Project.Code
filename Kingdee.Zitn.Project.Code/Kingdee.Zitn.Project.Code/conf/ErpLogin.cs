@@ -25,8 +25,10 @@ namespace Kingdee.Zitn.Project.Code.conf
         /* 开发环境 */
         private static class Dev
         {
-            public static string K3CloudUrl => Get("K3CloudApiUrl", "http://127.0.0.1/k3cloud/");
-            public static string AppId      => Get("K3CloudApiAppId", "6a54a3e5e05b91");
+            //public static string K3CloudUrl => Get("K3CloudApiUrl", "http://127.0.0.1/k3cloud/");
+            //public static string AppId      => Get("K3CloudApiAppId", "6a54a3e5e05b91");
+            public static string K3CloudUrl => Get("K3CloudApiUrl", "http://10.0.128.18/k3cloud/");
+            public static string AppId      => Get("K3CloudApiAppId", "6a7be2788b72d9");
             public static string UserName   => Get("K3CloudApiUserName", "admin");
             public static string Password   => Get("K3CloudApiPassword", "Flzx3qc!");
             public static int Lcid          => int.TryParse(Get("K3CloudApiLcid", "2052"), out var v) ? v : 2052;
