@@ -11,7 +11,10 @@
       "Read(//c/Users/Administrator/AppData/**)",
       "WebFetch(domain:open.sf-express.com)",
       "WebSearch",
-      "Read(//e//**)"
+      "Read(//e//**)",
+      "Bash(git -C \"E:/CodeFiles\" diff -- \"Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/plugin/PrdInstock/PrdInstockAuditToBPM.cs\")",
+      "Bash(git -C \"E:/CodeFiles\" status --short -- \"Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/conf/\")",
+      "Read(//e/VS-github/ERP/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/**)"
     ]
   }
 }

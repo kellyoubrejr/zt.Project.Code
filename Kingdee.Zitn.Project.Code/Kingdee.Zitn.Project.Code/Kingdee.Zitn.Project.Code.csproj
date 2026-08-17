@@ -102,7 +102,7 @@
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.1.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>F:\Newtonsoft.Json.dll</HintPath>
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -116,7 +116,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="libs\" />
-    <Folder Include="models\" />
+    <Folder Include="plugin\FKSQD\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="conf\CustomLog.cs" />
@@ -126,18 +126,41 @@
     <Compile Include="Interface\ToMES\MesService.cs" />
     <Compile Include="Interface\ToOther\OtherService.cs" />
     <Compile Include="Interface\ToPLM\PlmService.cs" />
+    <Compile Include="plugin\BillOrListPlugin\BillButtonEvent.cs" />
+    <Compile Include="plugin\BillOrListPlugin\BillControl.cs" />
+    <Compile Include="plugin\BillOrListPlugin\CloseBill.cs" />
+    <Compile Include="plugin\BillOrListPlugin\EntityAddOrCopyOrDelButton.cs" />
+    <Compile Include="plugin\BLPCZD\BLPCZDSubmitCheckMtrlNum.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushOutStock.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushTransferDirect.cs" />
     <Compile Include="plugin\FeedMtrl\FeedMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\FeedMtrl\TransferApplyAuditFeedMtrl.cs" />
     <Compile Include="plugin\MoRpt\MoRptSaveUpdateMaterialXLHInfo.cs" />
+    <Compile Include="plugin\OutStock\OutStockAuditSMVaildate.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockEntryButtonSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\PickMtrl\PickMtrlAuditTransferDirect.cs" />
     <Compile Include="plugin\PickMtrl\PickMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\PO\btnPoToBPMHT.cs" />
+    <Compile Include="plugin\PO\PoAuditToBPMHT.cs" />
+    <Compile Include="plugin\PO\PoCGZQOperation.cs" />
+    <Compile Include="plugin\PO\PoPriceOperation.cs" />
+    <Compile Include="plugin\PO\PoRejWriteSupplierInfos.cs" />
+    <Compile Include="plugin\PRDinstock\PrdInstockAuditToBPM.cs" />
+    <Compile Include="plugin\PrdInstock\PrdInstockAuditToBPMKF.cs" />
+    <Compile Include="plugin\PRDinstock\PrdInstockAuditToBPMSZ.cs" />
     <Compile Include="plugin\QC\QCAuditUpsertDateTime.cs" />
     <Compile Include="plugin\QC\QC_SaveOrSubmit_UpdateAutoFlag.cs" />
     <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\SLTZD\RecevieBillEntryBtnGetLot.cs" />
+    <Compile Include="plugin\StkInstock\StkInstockBtnToAssemble.cs" />
+    <Compile Include="plugin\StkInstock\StkInstockPushAssemble.cs" />
+    <Compile Include="plugin\TransferApply\TransferApplyAuditTransferDirect.cs" />
+    <Compile Include="plugin\TransferApply\TransferApplyEntryBtnUpsertStockField.cs" />
+    <Compile Include="plugin\TransferApply\TransferApplySumbitUpsertTransferDirectStockAndLocid.cs" />
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSuanBox.cs" />
+    <Compile Include="plugin\TransferDirect\TransferDirectAuditSMVaildate.cs" />
     <Compile Include="plugin\TransferDirect\TransferDitectEntryButtonSuanBox.cs" />
     <Compile Include="plugin\SFForm\SFApiAduit.cs" />
     <Compile Include="plugin\SFForm\SFExpressClient.cs" />
@@ -147,6 +170,11 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Schedule\JiaZhiFenLei.cs" />
     <Compile Include="Schedule\SFRouteSync.cs" />
+    <Compile Include="models\ErpDataDict.cs" />
+    <Compile Include="Util\Tools.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

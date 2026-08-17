@@ -1,7 +1,27 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.WebApi.Client.dll'\\\\''\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.WebApi.Client.K3CloudApiClient'\\\\''\\); $t.GetMethods\\(\\) | Where-Object { $_.DeclaringType -eq $t } | Select-Object -ExpandProperty Name | Sort-Object -Unique')",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.WebApi.Client.dll'\\\\''\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.WebApi.Client.K3CloudApiClient'\\\\''\\); $t.GetMethods\\(\\) | Where-Object { $_.Name -eq '\\\\''BillQuery'\\\\'' } | ForEach-Object { $_.ToString\\(\\) }')",
+      "WebSearch",
+      "WebFetch(domain:vip.kingdee.com)",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.WebApi.Client.dll'\\\\''\\); $asm.GetTypes\\(\\) | Where-Object { $_.Name -match '\\\\''Compare|Query|Filter'\\\\'' } | Select-Object -ExpandProperty FullName | Sort-Object')",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.WebApi.Client.dll'\\\\''\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.WebApi.Client.K3CloudApiClient'\\\\''\\); $t.GetMethods\\([Reflection.BindingFlags]'\\\\''Public,NonPublic,Instance,DeclaredOnly'\\\\''\\) | ForEach-Object { $_.ToString\\(\\) } | Sort-Object')",
+      "Read(//d/Program Files \\(x86\\)/Kingdee/K3Cloud/WebSite/Bin\" 2>/dev/**)",
+      "Read(//d/Program Files \\(x86\\)/Kingdee/K3Cloud/WebSite/Bin//**)",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'e:\\\\CodeFiles\\\\_inspect_types.ps1')",
+      "Bash(powershell.exe -NoProfile -Command '$p='\\\\''D:\\\\Program Files \\(x86\\)\\\\Kingdee\\\\K3Cloud\\\\WebSite\\\\Bin\\\\Kingdee.BOS.ServiceHelper.dll'\\\\''; if\\(!\\(Test-Path $p\\)\\){ $p='\\\\''libs/Kingdee.BOS.ServiceHelper.dll'\\\\'' }; $asm=[Reflection.Assembly]::LoadFrom\\($p\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.ServiceHelper.BusinessDataServiceHelper'\\\\''\\); $t.GetMethods\\(\\) | Where-Object { $_.Name -like '\\\\''*ReferenceData*'\\\\'' } | ForEach-Object { $_.ToString\\(\\) }')",
+      "Read(//d/Program Files \\(x86\\)/Kingdee/K3Cloud/WebSite/Bin/**)",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.ServiceHelper.dll'\\\\''\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.ServiceHelper.BusinessDataServiceHelper'\\\\''\\); if\\($t -eq $null\\){ Write-Output '\\\\''TYPE NULL'\\\\''; $asm.GetTypes\\(\\) | Where-Object { $_.Name -like '\\\\''*BusinessData*'\\\\'' } | Select-Object -ExpandProperty FullName } else { $t.GetMethods\\(\\) | Where-Object { $_.Name -like '\\\\''*ReferenceData*'\\\\'' } | ForEach-Object { $_.ToString\\(\\) } }')",
+      "Bash(powershell.exe -NoProfile -Command '$asm=[Reflection.Assembly]::LoadFrom\\('\\\\''libs/Kingdee.BOS.ServiceHelper.dll'\\\\''\\); $t=$asm.GetType\\('\\\\''Kingdee.BOS.ServiceHelper.BusinessDataServiceHelper'\\\\''\\); Write-Output \\('\\\\''TYPE: '\\\\'' + $t\\); if\\($t\\){ $t.GetMethods\\([Reflection.BindingFlags]'\\\\''Public,Static'\\\\''\\) | ForEach-Object { $_.Name } | Sort-Object -Unique }')",
+      "Bash(powershell.exe -NoProfile -Command 'Get-ChildItem libs/*.dll | ForEach-Object { try { $a=[Reflection.Assembly]::LoadFrom\\($_.FullName\\); $a.GetTypes\\(\\) | ForEach-Object { $t=$_; $t.GetMethods\\([Reflection.BindingFlags]'\\\\''Public,Static'\\\\''\\) | Where-Object { $_.Name -like '\\\\''*ReferenceData*'\\\\'' -or $_.Name -like '\\\\''*LoadRef*'\\\\'' } | ForEach-Object { Write-Output \\($t.FullName + '\\\\'' :: '\\\\'' + $_.ToString\\(\\)\\) } } } catch {} }')",
+      "Bash(mv Model/PpbomDict.cs models/PpbomDict.cs)",
+      "Bash(rmdir Model)",
+      "Read(//e/e/CodeFiles/Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/**)"
+    ],
     "additionalDirectories": [
-      "e:\\CodeFiles\\Kingdee.Zitn.Project.Code\\Kingdee.Zitn.Project.Code\\ApiDoc-SF"
+      "e:\\e\\CodeFiles\\Kingdee.Zitn.Project.Code\\Kingdee.Zitn.Project.Code\\models"
     ]
   }
 }
