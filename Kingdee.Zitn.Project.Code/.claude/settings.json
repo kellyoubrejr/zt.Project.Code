@@ -14,7 +14,19 @@
       "Read(//e//**)",
       "Bash(git -C \"E:/CodeFiles\" diff -- \"Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/plugin/PrdInstock/PrdInstockAuditToBPM.cs\")",
       "Bash(git -C \"E:/CodeFiles\" status --short -- \"Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/conf/\")",
-      "Read(//e/VS-github/ERP/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/**)"
+      "Read(//e/VS-github/ERP/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/Zitn_ErpToBpmWorkStartFlow_SZ_Plugin_AddLog1/**)",
+      "Read(//c/Users/Administrator/.claude/projects/e--CodeFiles/memory/**)",
+      "Read(//c/Users/Administrator/Pictures/**)",
+      "Bash(tesseract --version)",
+      "Bash(pdftotext -layout \"增值服务产品表-20260817162438.pdf\" -)",
+      "Bash(pdftotext -layout \"增值服务产品表-20260817162438.pdf\" \"/tmp/sf_products.txt\")",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)",
+      "Read(//d/Program Files \\(x86\\)/Kingdee/K3Cloud/WebSite/Bin/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Windows/Microsoft.NET/Framework64/v4.0.30319/**)",
+      "Bash(\"C:/Windows/Microsoft.NET/Framework64/v4.0.30319/MSBuild.exe\" Kingdee.Zitn.Project.Code.csproj -p:Configuration=Debug -p:OutputPath=\"C:/temp/k3build/\" -t:Build -v:minimal -nologo)",
+      "Bash(dotnet msbuild *)"
     ]
   }
 }

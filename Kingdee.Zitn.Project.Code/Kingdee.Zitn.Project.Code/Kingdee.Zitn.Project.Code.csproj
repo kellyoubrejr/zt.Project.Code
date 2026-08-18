@@ -153,6 +153,9 @@
     <Compile Include="plugin\QC\QCAuditUpsertDateTime.cs" />
     <Compile Include="plugin\QC\QC_SaveOrSubmit_UpdateAutoFlag.cs" />
     <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\SFBill\SFBillAuditOpe.cs" />
+    <Compile Include="plugin\SFBill\SFBillSaveGenOrderId.cs" />
+    <Compile Include="plugin\SFBill\SFExpressClient.cs" />
     <Compile Include="plugin\SLTZD\RecevieBillEntryBtnGetLot.cs" />
     <Compile Include="plugin\StkInstock\StkInstockBtnToAssemble.cs" />
     <Compile Include="plugin\StkInstock\StkInstockPushAssemble.cs" />
@@ -162,14 +165,9 @@
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSuanBox.cs" />
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSMVaildate.cs" />
     <Compile Include="plugin\TransferDirect\TransferDitectEntryButtonSuanBox.cs" />
-    <Compile Include="plugin\SFForm\SFApiAduit.cs" />
-    <Compile Include="plugin\SFForm\SFExpressClient.cs" />
-    <Compile Include="plugin\SFForm\SFApiUnAudit.cs" />
-    <Compile Include="plugin\SFForm\SFRouteService.cs" />
-    <Compile Include="plugin\SFForm\SFBillPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Schedule\JiaZhiFenLei.cs" />
-    <Compile Include="Schedule\SFRouteSync.cs" />
+    <Compile Include="Schedule\SFBillSync.cs" />
     <Compile Include="models\ErpDataDict.cs" />
     <Compile Include="Util\Tools.cs" />
   </ItemGroup>
