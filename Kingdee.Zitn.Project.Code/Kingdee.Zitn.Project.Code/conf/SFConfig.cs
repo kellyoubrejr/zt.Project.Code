@@ -1,7 +1,7 @@
 using System;
 using System.Configuration;
 
-namespace Kingdee.Zitn.Project.Code.plugin.SFForm
+namespace Kingdee.Zitn.Project.Code.conf
 {
     /// <summary>
     /// 顺丰开放平台配置
@@ -68,6 +68,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFForm
         public static string SenderCity     => Pick(Dev.SenderCity, Prod.SenderCity);
         public static string SenderDistrict => Pick(Dev.SenderDistrict, Prod.SenderDistrict);
         public static string SenderAddress  => Pick(Dev.SenderAddress, Prod.SenderAddress);
+
+        /// <summary>寄件人完整地址（省+市+区+详细地址，可直接传入顺丰 address 字段）</summary>
+        public static string SenderFullAddress => SenderProvince + SenderCity + SenderDistrict + SenderAddress;
 
         private static T Pick<T>(T dev, T prod) =>
             Environment == EnvironmentType.DEV ? dev : prod;
