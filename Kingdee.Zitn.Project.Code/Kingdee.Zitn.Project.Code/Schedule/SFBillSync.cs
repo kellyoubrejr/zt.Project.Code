@@ -103,11 +103,8 @@ namespace Kingdee.Zitn.Project.Code.Schedule
             // 先清空旧轨迹，再插入最新
             DBUtils.Execute(ctx, $"/*dialect*/DELETE FROM {ROUTE_TABLE} WHERE FID = {fid}");
 
-            int seq = 0;
             foreach (var r in routes)
             {
-                seq++;
-                long entryId = NextEntryId(ctx, ROUTE_TABLE);
                 string acceptTime = r["acceptTime"]?.ToString() ?? "";
                 string acceptAddress = r["acceptAddress"]?.ToString() ?? "";
                 string remark = r["remark"]?.ToString() ?? "";
@@ -115,10 +112,12 @@ namespace Kingdee.Zitn.Project.Code.Schedule
                 string statusName = r["secondaryStatusName"]?.ToString()
                                     ?? r["firstStatusName"]?.ToString() ?? "";
 
+                long entryId = NextEntryId(ctx, ROUTE_TABLE);
+
                 var sql = $@"/*dialect*/INSERT INTO {ROUTE_TABLE}
-                        (FENTRYID, FID, FSEQ, FAcceptTime, FAcceptAddress, FRemark, FOpCode, FStatusName)
+                        (FENTRYID, FID, FAcceptTime1, FAcceptAddress, FRemark, FOpCode, FStatusName)
                     VALUES
-                        ({entryId}, {fid}, {seq}, '{Sql(acceptTime)}', '{Sql(acceptAddress)}', '{Sql(remark)}', '{Sql(opCode)}', '{Sql(statusName)}')";
+                        ({entryId}, {fid}, '{Sql(acceptTime)}', '{Sql(acceptAddress)}', '{Sql(remark)}', '{Sql(opCode)}', '{Sql(statusName)}')";
                 DBUtils.Execute(ctx, sql);
             }
 
@@ -150,24 +149,23 @@ namespace Kingdee.Zitn.Project.Code.Schedule
 
             DBUtils.Execute(ctx, $"/*dialect*/DELETE FROM {FEE_TABLE} WHERE FID = {fid}");
 
-            int seq = 0;
             decimal total = 0;
             foreach (var fee in feeList)
             {
-                seq++;
-                long entryId = NextEntryId(ctx, FEE_TABLE);
-                string feeType = fee["type"]?.ToString() ?? "";
+                string feeType = FeeTypeName(fee["type"]?.ToString() ?? "");
                 string feeName = fee["name"]?.ToString() ?? "";
                 decimal feeValue = 0;
                 decimal.TryParse(fee["value"]?.ToString(), out feeValue);
-                string settlementType = fee["settlementTypeCode"]?.ToString() ?? "";
+                string settlementType = SettlementTypeName(fee["settlementTypeCode"]?.ToString() ?? "");
 
                 total += feeValue;
 
+                long entryId = NextEntryId(ctx, FEE_TABLE);
+
                 var sql = $@"/*dialect*/INSERT INTO {FEE_TABLE}
-                        (FENTRYID, FID, FSEQ, FFeeType, FFeeName, FFeeValue, FSettlementType)
+                        (FENTRYID, FID, FFeeType, FFeeName, FFeeValue, FSettlementType)
                     VALUES
-                        ({entryId}, {fid}, {seq}, '{Sql(feeType)}', '{Sql(feeName)}', {feeValue.ToString(CultureInfo.InvariantCulture)}, '{Sql(settlementType)}')";
+                        ({entryId}, {fid}, '{Sql(feeType)}', '{Sql(feeName)}', {feeValue.ToString(CultureInfo.InvariantCulture)}, '{Sql(settlementType)}')";
                 DBUtils.Execute(ctx, sql);
             }
 
@@ -189,6 +187,31 @@ namespace Kingdee.Zitn.Project.Code.Schedule
         private static string Sql(string s)
         {
             return string.IsNullOrEmpty(s) ? "" : s.Replace("'", "''");
+        }
+
+        /// <summary>费用类型(type) 数字枚举 → 中文</summary>
+        private static string FeeTypeName(string code)
+        {
+            switch (code)
+            {
+                case "1": return "运费";
+                case "2": return "其它费用";
+                case "3": return "基础保";
+                case "8": return "签单返还-纸质回单";
+                case "91": return "拍照回传";
+                default: return code;
+            }
+        }
+
+        /// <summary>结算类型(settlementTypeCode) 数字枚举 → 中文</summary>
+        private static string SettlementTypeName(string code)
+        {
+            switch (code)
+            {
+                case "1": return "现结";
+                case "2": return "月结";
+                default: return code;
+            }
         }
     }
 }
