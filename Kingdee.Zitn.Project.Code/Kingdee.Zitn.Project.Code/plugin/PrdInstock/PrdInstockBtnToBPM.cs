@@ -1,162 +1,96 @@
-﻿using Kingdee.BOS.Core.DynamicForm;
+using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
-using Kingdee.BOS.WebApi.Client;
-using Newtonsoft.Json.Linq;
+using Kingdee.Zitn.Project.Code.conf;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Net;
 using System.Text;
-using static Kingdee.K3.MFG.App.AppServiceContext;
-using Kingdee.Zitn.Project.Code.conf;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
 {
-    [Description("【生产入库审核服务】--客返(KF)直接推送BpmApi；报检(BJD)校验最后一次入库后推送BpmApi")]
+    [Description("【生产入库表单服务】【按钮】--客返(KF)直接推送BpmApi；报检(BJD)校验最后一次入库后推送BpmApi")]
     [HotUpdate]
-    public class PrdInstockAuditToBPM : AbstractOperationServicePlugIn
+    public class PrdInstockBtnToBPM : AbstractDynamicFormPlugIn
     {
-        private static readonly CustomLog.LogWriter _log = CustomLog.For("生产入库审核推送BpmApi");
+        private static readonly CustomLog.LogWriter _log = CustomLog.For("生产入库按钮补偿推送BpmApi");
 
-        public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
+        public override void BarItemClick(BarItemClickEventArgs e)
         {
+            base.BarItemClick(e);
+
+            if (!e.BarItemKey.Equals("bpmapi_btn", StringComparison.OrdinalIgnoreCase))
+                return;
+
             try
             {
-                base.AfterExecuteOperationTransaction(e);
+                string sequenceNo = this.View.Model.GetValue("Fysdjh")?.ToString();
 
-                var ids = string.Join(",",
-                    e.DataEntitys.Select(o => o[0]));
-
-                _log.Section($"审核开始，FIDs: {ids}");
-
-                var client = new K3CloudApiClient(ErpLogin.K3CloudUrl);
-                var loginResult = client.ValidateLogin(
-                    ErpLogin.AppId,
-                    ErpLogin.UserName,
-                    ErpLogin.Password,
-                    ErpLogin.Lcid
-                );
-
-                _log.WriteLog($"登录结果: {loginResult}");
-
-                var resultType =
-                    JObject.Parse(loginResult)["LoginResultType"]
-                    .Value<int>();
-
-                if (resultType != 1)
+                if (string.IsNullOrEmpty(sequenceNo))
                 {
-                    _log.WriteLog($"登录失败，LoginResultType={resultType}，跳过推送");
+                    this.View.ShowErrMessage("未获取到有效的云枢单据号，操作已中止。");
                     return;
                 }
 
-                _log.WriteLog("登录成功");
+                _log.Section($"按钮补偿开始，运单号: {sequenceNo}");
 
-                var query = string.Format(@"
-                                            SELECT DISTINCT A.Fysdjh
-                                            FROM T_PRD_INSTOCK A
-                                            WHERE A.FID IN ({0}) AND A.FDOCUMENTSTATUS = 'C'", ids);
-
-                DynamicObjectCollection collection =
-                    DbUtils.ExecuteDynamicObject(
-                        this.Context,
-                        query);
-
-                if (collection == null || collection.Count == 0)
+                if (sequenceNo.StartsWith("BJD"))
                 {
-                    _log.WriteLog($"未查询到运单号，FIDs: {ids}");
-                    return;
+                    // 报检：先校验是否最后一次入库
+                    if (!IsLastInstock(sequenceNo))
+                    {
+                        _log.WriteLog($"报检单 {sequenceNo} 非最后一次入库，跳过推送");
+                        this.View.ShowMessage("报检单非最后一次入库，未推送BpmApi。");
+                        return;
+                    }
+                    _log.WriteLog($"报检单 {sequenceNo} 为最后一次入库，准备推送");
                 }
-
-                _log.WriteLog($"查询到 {collection.Count} 条运单号记录");
-
-                var failedList = new List<string>();
-
-                for (int i = 0; i < collection.Count; i++)
+                else if (sequenceNo.StartsWith("KF"))
                 {
-                    string sequenceNo =
-                        collection[i]["Fysdjh"]?.ToString();
-
-                    if (string.IsNullOrEmpty(sequenceNo))
-                    {
-                        _log.WriteLog("运单号为空，跳过");
-                        continue;
-                    }
-
-                    _log.WriteLog($"[{i + 1}/{collection.Count}] 运单号: {sequenceNo}");
-
-                    if (sequenceNo.StartsWith("BJD"))
-                    {
-                        // 报检：先校验是否最后一次入库
-                        if (!IsLastInstock(sequenceNo))
-                        {
-                            _log.WriteLog($"报检单 {sequenceNo} 非最后一次入库，跳过推送");
-                            continue;
-                        }
-                        _log.WriteLog($"报检单 {sequenceNo} 为最后一次入库，准备推送");
-                    }
-                    else if (sequenceNo.StartsWith("KF"))
-                    {
-                        // 客返：直接推送
-                        _log.WriteLog($"客返单 {sequenceNo} 直接推送");
-                    }
-                    else
-                    {
-                        _log.WriteLog($"运单号 {sequenceNo} 前缀非 KF/BJD，跳过");
-                        continue;
-                    }
-
-                    var dataToSend = new
-                    {
-                        sequenceNo = sequenceNo
-                    };
-
-                    string jsonBody =
-                        JsonConvert.SerializeObject(dataToSend);
-
-                    string apiUrl =
-                        //"http://10.0.32.10:8769/api/public/aftersale/noticeSend";
-                        "http://10.0.128.10:8081/api/public/aftersale/noticeSend";
-
-                    string responseText;
-                    bool success = CallApi(apiUrl, jsonBody, out responseText);
-
-                    if (success)
-                    {
-                        _log.WriteLog($"推送成功，运单号: {sequenceNo}，响应: {responseText}");
-                    }
-                    else
-                    {
-                        _log.WriteLog($"推送失败，运单号: {sequenceNo}，响应: {responseText}");
-                        failedList.Add(sequenceNo);
-                    }
-                }
-
-                if (failedList.Count > 0)
-                {
-                    _log.WriteLog($"推送完成，失败 {failedList.Count} 条，运单号: {string.Join(",", failedList)}");
-
-                    var result = new OperateResult();
-                    result.Message = string.Format(
-                        "生产入库单审核成功，但数据推送BpmApi失败！失败运单号：{0}，请检查日志。",
-                        string.Join(",", failedList));
-                    this.OperationResult.IsShowMessage = true;
-                    this.OperationResult.OperateResult.Add(result);
+                    // 客返：直接推送
+                    _log.WriteLog($"客返单 {sequenceNo} 直接推送");
                 }
                 else
                 {
-                    _log.WriteLog("全部推送成功");
+                    _log.WriteLog($"运单号 {sequenceNo} 前缀非 KF/BJD，跳过推送");
+                    this.View.ShowMessage($"运单号 {sequenceNo} 前缀非 KF/BJD，未推送BpmApi。");
+                    return;
+                }
+
+                var dataToSend = new
+                {
+                    sequenceNo = sequenceNo
+                };
+
+                string jsonBody = JsonConvert.SerializeObject(dataToSend);
+
+                string apiUrl =
+                        //"http://10.0.32.10:8769/api/public/aftersale/noticeSend";
+                        "http://10.0.128.10:8081/api/public/aftersale/noticeSend";
+
+                string responseText;
+                bool success = CallApi(apiUrl, jsonBody, out responseText);
+
+                if (success)
+                {
+                    _log.WriteLog($"推送成功，运单号: {sequenceNo}，响应: {responseText}");
+                    this.View.ShowMessage("推送BpmApi成功！");
+                }
+                else
+                {
+                    _log.WriteLog($"推送失败，运单号: {sequenceNo}，响应: {responseText}");
+                    this.View.ShowErrMessage($"接口调用失败！\n返回信息：{responseText}");
                 }
             }
             catch (Exception ex)
             {
-                _log.Error("审核插件异常");
+                _log.Error("按钮补偿插件异常");
                 _log.Error(ex);
-                _log.Error($"完整异常: {ex}");
+                this.View.ShowErrMessage($"系统异常：{ex.Message}");
             }
         }
 
@@ -169,7 +103,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
             var moSql = string.Format(
                 "SELECT FID, FBILLNO FROM T_PRD_MO WHERE F_PAEZ_TEXT = '{0}'",
                 fysdjh);
-            var moList = DbUtils.ExecuteDynamicObject(this.Context, moSql);
+            var moList = DBUtils.ExecuteDynamicObject(this.Context, moSql);
 
             if (moList == null || moList.Count == 0)
             {
@@ -189,7 +123,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 var matSql = string.Format(
                     "SELECT FMATERIALID, FQTY FROM T_PRD_MO A JOIN T_PRD_MOENTRY B ON A.FID = B.FID WHERE A.FID = {0}",
                     moFid);
-                var moMats = DbUtils.ExecuteDynamicObject(this.Context, matSql);
+                var moMats = DBUtils.ExecuteDynamicObject(this.Context, matSql);
 
                 if (moMats == null || moMats.Count == 0)
                 {
@@ -219,7 +153,7 @@ SELECT B.FMATERIALID, SUM(B.FREALQTY) AS FREALQTY
 FROM T_PRD_INSTOCK A JOIN T_PRD_INSTOCKENTRY B ON A.FID = B.FID
 WHERE A.Fysdjh = '{0}' AND A.FDOCUMENTSTATUS = 'C'
 GROUP BY B.FMATERIALID", fysdjh);
-            var instockMats = DbUtils.ExecuteDynamicObject(this.Context, instockSql);
+            var instockMats = DBUtils.ExecuteDynamicObject(this.Context, instockSql);
 
             var instockMatQty = new Dictionary<long, decimal>();
             if (instockMats != null)

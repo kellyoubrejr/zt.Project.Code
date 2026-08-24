@@ -19,7 +19,7 @@ using Kingdee.Zitn.Project.Code.conf;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PrdInstock
 {
-    [Description("【生产入库单服务】：审核调用BpmApi客返")]
+    [Description("【生产入库单服务】：审核调用BpmApi客返【弃用】")]
     [HotUpdate]
     public class PrdInstockAuditToBPMKF : AbstractOperationServicePlugIn
     {
