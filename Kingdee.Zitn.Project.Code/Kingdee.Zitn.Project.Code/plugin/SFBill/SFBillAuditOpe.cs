@@ -68,12 +68,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             _log.Section($"开始顺丰下单：{billNo} (FID={fid})");
 
             // 2. 必填校验
-            if (string.IsNullOrEmpty(waybillNo))
-            {
-                _log.WriteLog("顺丰运单号(FSFYDH)为空，跳过下单");
-                UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "顺丰运单号为空");
-                return;
-            }
+            //【自动分配运单号】isGenWaybillNo=1 时 FSFYDH 由顺丰返回、无需录入，故跳过此项校验。
+            //【切回带单号下单】isGenWaybillNo=0 时，放开下面这段校验即可。
+            //if (string.IsNullOrEmpty(waybillNo))
+            //{
+            //    _log.WriteLog("顺丰运单号(FSFYDH)为空，跳过下单");
+            //    UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "顺丰运单号为空");
+            //    return;
+            //}
             if (string.IsNullOrEmpty(receiver))
             {
                 _log.WriteLog("收件人(FSJR)为空，跳过下单");
@@ -132,6 +134,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 string filterResult = "";
                 string routeLabel = "";
+                string assignedWaybillNo = "";
                 var md = apiResult.MsgData;
                 if (md != null)
                 {
@@ -143,8 +146,18 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                         if (rld != null)
                             routeLabel = rld["destRouteLabel"]?.ToString() ?? "";
                     }
+                    //【自动分配运单号】从返回里取出顺丰分配的运单号
+                    var waybillInfo = md["waybillNoInfoList"] as JArray;
+                    if (waybillInfo != null && waybillInfo.Count > 0)
+                        assignedWaybillNo = waybillInfo[0]["waybillNo"]?.ToString() ?? "";
                 }
-                _log.WriteLog($"下单成功：运单号={waybillNo}，筛单结果={filterResult}，路由标签={routeLabel}");
+
+                //【自动分配运单号】把顺丰分配的运单号回写到 FSFYDH，供后续路由/运费同步使用
+                if (!string.IsNullOrEmpty(assignedWaybillNo))
+                    UpdateWaybillNo(fid, assignedWaybillNo);
+
+                string resultWaybillNo = string.IsNullOrEmpty(assignedWaybillNo) ? waybillNo : assignedWaybillNo;
+                _log.WriteLog($"下单成功：运单号={resultWaybillNo}，筛单结果={filterResult}，路由标签={routeLabel}");
                 UpdateHeadStatus(fid, "B", filterResult, routeLabel, apiResult.RequestId, DateTime.Now, "");
             }
             else
@@ -163,12 +176,16 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             var msg = new JObject();
             msg["language"] = "zh-CN";
             msg["orderId"] = orderId;
-            msg["isGenWaybillNo"] = 0; // 带单号下单：不分配运单号
+            //【自动分配运单号】isGenWaybillNo=1：由顺丰分配运单号，不传 waybillNoInfoList。
+            msg["isGenWaybillNo"] = 1;
 
-            // 顺丰运单号列表（预印面单已有运单号）
-            var waybillList = new JArray();
-            waybillList.Add(new JObject { ["waybillType"] = 1, ["waybillNo"] = waybillNo });
-            msg["waybillNoInfoList"] = waybillList;
+            //【切回带单号下单】isGenWaybillNo=0 时，放开下面两段：isGenWaybillNo=0 + waybillNoInfoList。
+            //msg["isGenWaybillNo"] = 0;
+
+            // 顺丰运单号列表（带单号下单时传预印面单号）
+            //var waybillList = new JArray();
+            //waybillList.Add(new JObject { ["waybillType"] = 1, ["waybillNo"] = waybillNo });
+            //msg["waybillNoInfoList"] = waybillList;
 
             // 托寄物（货物名称暂时写死）
             var cargoList = new JArray();
@@ -266,20 +283,34 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             }
         }
 
+        /// <summary>回写顺丰分配的运单号（自动分配运单号场景）</summary>
+        private void UpdateWaybillNo(long fid, string waybillNo)
+        {
+            try
+            {
+                DBUtils.Execute(this.Context,
+                    $@"/*dialect*/UPDATE {HEAD_TABLE} SET FSFYDH = '{Sql(waybillNo)}' WHERE FID = {fid}");
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"回写运单号失败，FID={fid}");
+                _log.Error(ex);
+            }
+        }
+
         /// <summary>写入报文单据体</summary>
         private void InsertMessage(long fid, string serviceCode, SFApiResult apiResult)
         {
             try
             {
                 long entryId = NextEntryId(BW_TABLE);
-                long seq = NextSeq(BW_TABLE, fid);
                 string success = apiResult.Success ? "1" : "0";
 
                 var sql = $@"/*dialect*/INSERT INTO {BW_TABLE}
-                        (FENTRYID, FID, FSEQ, FServiceCode, FRequestId, FCallTime, FRequestMsg, FResponseMsg, FSuccess, FErrorMsg)
+                        (FENTRYID, FID, FServiceCode, FRequestId, FCallTime, FRequestMsg, FResponseMsg, FSuccess, FErrorMsg)
                     VALUES
-                        ({entryId}, {fid}, {seq}, '{Sql(serviceCode)}', '{Sql(apiResult.RequestId)}', GETDATE(),
-                         '{Sql(Truncate(apiResult.RequestMsg))}', '{Sql(Truncate(apiResult.ResponseMsg))}', '{success}', '{Sql(Truncate(apiResult.ErrorMsg))}')";
+                        ({entryId}, {fid}, '{Sql(Truncate(serviceCode, 50))}', '{Sql(Truncate(apiResult.RequestId, 50))}', GETDATE(),
+                         '{Sql(Truncate(apiResult.RequestMsg, 255))}', '{Sql(Truncate(apiResult.ResponseMsg, 255))}', '{success}', '{Sql(Truncate(apiResult.ErrorMsg, 50))}')";
                 DBUtils.Execute(this.Context, sql);
             }
             catch (Exception ex)
@@ -293,13 +324,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
         {
             var r = DBUtils.ExecuteDynamicObject(this.Context,
                 $"/*dialect*/SELECT ISNULL(MAX(FENTRYID), 0) AS MX FROM {table}");
-            return (r != null && r.Count > 0) ? Convert.ToInt64(r[0]["MX"]) + 1 : 1;
-        }
-
-        private long NextSeq(string table, long fid)
-        {
-            var r = DBUtils.ExecuteDynamicObject(this.Context,
-                $"/*dialect*/SELECT ISNULL(MAX(FSEQ), 0) AS MX FROM {table} WHERE FID = {fid}");
             return (r != null && r.Count > 0) ? Convert.ToInt64(r[0]["MX"]) + 1 : 1;
         }
 

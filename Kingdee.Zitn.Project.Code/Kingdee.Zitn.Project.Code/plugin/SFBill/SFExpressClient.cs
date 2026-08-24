@@ -1,4 +1,5 @@
 using Kingdee.Zitn.Project.Code.conf;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Net;
@@ -21,6 +22,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
         public const string SERVICE_SEARCH_ROUTES = "EXP_RECE_SEARCH_ROUTES";
         /// <summary>清单运费查询接口</summary>
         public const string SERVICE_QUERY_SFWAYBILL = "EXP_RECE_QUERY_SFWAYBILL";
+        /// <summary>图片注册及推送接口</summary>
+        public const string SERVICE_REGISTER_PICTURE = "EXP_RECE_REGISTER_WAYBILL_PICTURE";
 
         /// <summary>
         /// 调用顺丰接口
@@ -38,13 +41,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 string requestId = Guid.NewGuid().ToString("N");
                 string timestamp = DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString();
 
-                // 1. URL 编码 msgData（与签名、传输保持一致）
+                // 1. URL 编码 msgData（仅用于 form 传输，签名用原始报文）
                 string msgDataEncoded = UrlEncode(msgDataJson);
 
-                // 2. 签名：Base64(MD5(urlEncode(msgData) + timestamp + checkWord))
-                string toVerify = msgDataEncoded + timestamp + checkWord;
-                string md5Hex = Md5Hex(toVerify);
-                string msgDigest = UrlEncode(Convert.ToBase64String(Encoding.UTF8.GetBytes(md5Hex)));
+                // 2. 签名（简易MD5）：Base64(MD5(msgData原始报文 + timestamp + checkWord))，不做 URL 编码
+                string toVerify = msgDataJson + timestamp + checkWord;
+                byte[] md5Bytes = Md5Bytes(toVerify);
+                string msgDigest = Convert.ToBase64String(md5Bytes);
 
                 // 3. 组装 form-urlencoded 表单
                 var form = new StringBuilder();
@@ -52,7 +55,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 form.Append("&requestID=").Append(UrlEncode(requestId));
                 form.Append("&serviceCode=").Append(UrlEncode(serviceCode));
                 form.Append("&timestamp=").Append(timestamp);
-                form.Append("&msgDigest=").Append(msgDigest);
+                form.Append("&msgDigest=").Append(UrlEncode(msgDigest));
                 form.Append("&msgData=").Append(msgDataEncoded);
 
                 _log.WriteLog($"调用服务 [{serviceCode}]，requestID={requestId}");
@@ -79,13 +82,42 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
         }
 
         /// <summary>
-        /// 解析公共响应。顺丰可能返回两种结构：
+        /// 注册图片（EXP_RECE_REGISTER_WAYBILL_PICTURE）
+        /// imgType：71=拍照回传(IN91)，2=纸质回单(IN03)
+        /// 注意：注册只"下单"图片获取请求，图片由顺丰异步推送到回调地址，此处不返回图片内容
+        /// </summary>
+        public static SFApiResult RegisterPicture(string waybillNo, string imgType)
+        {
+            var msg = new JObject
+            {
+                ["clientCode"] = SFConfig.PartnerID,
+                ["customerAcctCode"] = SFConfig.MonthlyCard,
+                ["waybillNo"] = waybillNo,
+                ["imgType"] = imgType
+            };
+            return Call(SERVICE_REGISTER_PICTURE, JsonConvert.SerializeObject(msg));
+        }
+
+        /// <summary>
+        /// 解析公共响应。顺丰可能返回三种结构：
         /// 1) 直接 { success, errorCode, errorMsg, msgData }
         /// 2) { apiResultCode, apiResultData: "json字符串" }，其中 apiResultData 里是 1) 的结构
+        /// 3) 网关层错误 { apiResultCode, apiErrorMsg, apiResponseID }，无业务报文
         /// </summary>
         private static void ParseResponse(string responseText, SFApiResult result)
         {
             var root = JObject.Parse(responseText);
+
+            // 网关层错误（如 A1006 数字签名无效）：apiErrorMsg 非空表示平台层报错，无业务报文
+            string apiErrorMsg = root["apiErrorMsg"]?.Value<string>() ?? "";
+            if (!string.IsNullOrEmpty(apiErrorMsg))
+            {
+                result.Success = false;
+                result.ErrorCode = root["apiResultCode"]?.Value<string>() ?? "";
+                result.ErrorMsg = apiErrorMsg;
+                result.MsgData = null;
+                return;
+            }
 
             JToken data = root;
             if (root["apiResultData"] != null)
@@ -106,22 +138,18 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             using (var client = new WebClient())
             {
                 client.Encoding = Encoding.UTF8;
-                client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
+                client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded;charset=UTF-8";
                 byte[] postBytes = Encoding.UTF8.GetBytes(formBody);
                 byte[] respBytes = client.UploadData(url, "POST", postBytes);
                 return Encoding.UTF8.GetString(respBytes);
             }
         }
 
-        private static string Md5Hex(string input)
+        private static byte[] Md5Bytes(string input)
         {
             using (var md5 = MD5.Create())
             {
-                byte[] bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(input));
-                var sb = new StringBuilder();
-                foreach (byte b in bytes)
-                    sb.Append(b.ToString("x2"));
-                return sb.ToString();
+                return md5.ComputeHash(Encoding.UTF8.GetBytes(input));
             }
         }
 
