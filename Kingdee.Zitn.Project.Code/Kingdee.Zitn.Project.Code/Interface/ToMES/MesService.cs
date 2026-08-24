@@ -23,7 +23,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
             : base(context)
         {
         }
-               
+
         /// <summary>
         /// 获取生产订单信息
         /// </summary>
@@ -721,6 +721,169 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
                 }
 
                 return new { StatusCode = 200, Message = "查询成功", Total = list.Count, Data = list };
+            }
+            catch (Exception ex)
+            {
+                return new { StatusCode = 500, Message = "服务器错误: " + ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// 保存包装箱标签（ZMER_BZXBQ），支持批量多箱
+        /// </summary>
+        /// <param name="data">
+        /// JSON 字符串，箱号数组（或 {"Data":[...]}）。
+        /// 单个包装箱结构：{"FBZXLH":"包装序列号","FEntity":[{"FWLNUM":"物料编码","FXLH":"序列号"}]}
+        /// FEntity 为扁平明细，每个序列号一行（一箱对应多个物料、每个物料多个序列号时逐条铺平）。
+        /// 示例：
+        /// [{"FBZXLH":"BZX001","FEntity":[{"FWLNUM":"WL001","FXLH":"SN001"},{"FWLNUM":"WL001","FXLH":"SN002"}]},
+        ///  {"FBZXLH":"BZX002","FEntity":[{"FWLNUM":"WL002","FXLH":"SN003"}]}]
+        /// </param>
+        public object SaveBZXBQ(string data)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+                return new { StatusCode = 401, Message = "超时，请重新登录" };
+
+            if (string.IsNullOrWhiteSpace(data))
+                return new { StatusCode = 400, Message = "参数不能为空" };
+
+            try
+            {
+                // 入参支持 [箱号数组] 或 {"Data":[箱号数组]}
+                var root = JToken.Parse(data);
+                JArray boxList;
+                if (root is JArray arr)
+                    boxList = arr;
+                else if (root is JObject obj && obj["Data"] is JArray arr2)
+                    boxList = arr2;
+                else
+                    return new { StatusCode = 400, Message = "入参格式错误，应为箱号数组" };
+
+                if (boxList.Count == 0)
+                    return new { StatusCode = 400, Message = "箱号列表为空" };
+
+                var client = new K3CloudApiClient(ErpLogin.K3CloudUrl);
+                var loginResult = client.ValidateLogin(
+                    ErpLogin.AppId,
+                    ErpLogin.UserName,
+                    ErpLogin.Password,
+                    ErpLogin.Lcid
+                );
+                if (JObject.Parse(loginResult)["LoginResultType"].Value<int>() != 1)
+                    return new { StatusCode = 500, Message = "K3Cloud 登录失败" };
+
+                var resultList = new List<object>();
+                int successCount = 0, failCount = 0;
+
+                foreach (var boxToken in boxList)
+                {
+                    if (!(boxToken is JObject box))
+                        continue;
+
+                    string fbzxLH = box["FBZXLH"]?.ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(fbzxLH))
+                    {
+                        failCount++;
+                        resultList.Add(new { FBZXLH = "", Success = false, Message = "包装序列号为空" });
+                        continue;
+                    }
+
+                    // 防重：包装序列号唯一
+                    var exist = Tools.GetItemArray(ctx, "ZMER_BZXBQ",
+                        $"FBZXLH = '{fbzxLH.Replace("'", "''")}'");
+                    if (exist != null && exist.Length > 0)
+                    {
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Message = "该包装序列号已存在" });
+                        continue;
+                    }
+
+                    var entries = box["FEntity"] as JArray;
+                    if (entries == null || entries.Count == 0)
+                    {
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Message = "明细不能为空" });
+                        continue;
+                    }
+
+                    // 构建单据体：每个序列号一行
+                    var entityArray = new JArray();
+                    foreach (var e in entries)
+                    {
+                        if (!(e is JObject entryObj)) continue;
+                        entityArray.Add(new JObject
+                        {
+                            ["FEntryID"] = 0,
+                            ["FWLNUM"] = entryObj["FWLNUM"]?.ToString() ?? "",
+                            ["FXLH"] = entryObj["FXLH"]?.ToString() ?? ""
+                        });
+                    }
+
+                    if (entityArray.Count == 0)
+                    {
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Message = "明细解析为空" });
+                        continue;
+                    }
+
+                    var modelObj = new JObject
+                    {
+                        ["FID"] = 0,
+                        ["FBillNo"] = "",
+                        ["FBZXLH"] = fbzxLH,
+                        ["F_ZMER_Entity_moz"] = entityArray
+                    };
+
+                    var saveObj = new JObject
+                    {
+                        ["NeedUpDateFields"] = new JArray(),
+                        ["NeedReturnFields"] = new JArray(),
+                        ["IsDeleteEntry"] = "true",
+                        ["SubSystemId"] = "",
+                        ["IsVerifyBaseDataField"] = "false",
+                        ["IsEntryBatchFill"] = "true",
+                        ["ValidateFlag"] = "true",
+                        ["NumberSearch"] = "true",
+                        ["IsAutoAdjustField"] = "true",
+                        ["InterationFlags"] = "",
+                        ["IgnoreInterationFlag"] = "",
+                        ["IsControlPrecision"] = "false",
+                        ["ValidateRepeatJson"] = "true",
+                        ["Model"] = modelObj
+                    };
+
+                    var saveResultJson = client.Save("ZMER_BZXBQ", saveObj.ToString());
+                    var saveJObj = JObject.Parse(saveResultJson);
+                    bool saveOk = saveJObj["Result"]["ResponseStatus"]["IsSuccess"].Value<bool>();
+
+                    string errMsg = null;
+                    if (!saveOk)
+                        errMsg = saveJObj["Result"]["ResponseStatus"]["Errors"]?[0]?["Message"]?.ToString() ?? "未知保存错误";
+
+                    string newId = saveJObj["Result"]?["Id"]?.ToString();
+                    string newNumber = saveJObj["Result"]?["Number"]?.ToString();
+
+                    if (saveOk) successCount++; else failCount++;
+
+                    resultList.Add(new
+                    {
+                        FBZXLH = fbzxLH,
+                        Success = saveOk,
+                        Id = newId,
+                        Number = newNumber,
+                        Message = saveOk ? "保存成功" : errMsg
+                    });
+                }
+
+                return new
+                {
+                    StatusCode = 200,
+                    Message = "完成",
+                    SuccessCount = successCount,
+                    FailCount = failCount,
+                    Data = resultList
+                };
             }
             catch (Exception ex)
             {
