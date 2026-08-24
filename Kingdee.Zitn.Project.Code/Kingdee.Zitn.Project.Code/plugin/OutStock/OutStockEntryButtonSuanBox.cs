@@ -95,10 +95,14 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                         var serials = entries[i][serialPropName] as DynamicObjectCollection;
                         if (serials != null && serials.Count > 0)
                         {
+                            int boxedCount = 0;
                             for (int k = 0; k < serials.Count; k++)
                             {
-                                int boxNo = (int)(k / bestPerBox) + 1;
+                                if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
+                                    continue;
+                                int boxNo = (int)(boxedCount / bestPerBox) + 1;
                                 serials[k]["FXC"] = boxNo;
+                                boxedCount++;
                             }
                         }
                     }
@@ -193,14 +197,18 @@ WHERE FCP = '{materialId}'
                         continue;
                     }
 
+                    int boxedCount = 0;
                     for (int k = 0; k < serials.Count; k++)
                     {
-                        int boxNo = (int)(k / ffhbzsl) + 1;
+                        if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
+                            continue;
+                        int boxNo = (int)(boxedCount / ffhbzsl) + 1;
                         serials[k]["FXC"] = boxNo;
+                        boxedCount++;
                     }
 
-                    int totalBoxes = (int)Math.Ceiling(serials.Count / ffhbzsl);
-                    log.WriteLog($"  第{i + 1}行 物料{materialNo} 箱次重新分配完成: {serials.Count}个序列号分{totalBoxes}箱, 每箱{ffhbzsl}个");
+                    int totalBoxes = (int)Math.Ceiling(boxedCount / ffhbzsl);
+                    log.WriteLog($"  第{i + 1}行 物料{materialNo} 箱次重新分配完成: {boxedCount}/{serials.Count}个序列号分{totalBoxes}箱, 每箱{ffhbzsl}个");
                 }
 
                 log.WriteLog($"{billNo} 手工算箱完成");
@@ -213,6 +221,13 @@ WHERE FCP = '{materialId}'
             }
 
             log.Section("手工算箱结束");
+        }
+
+        private static bool IsYes(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return false;
+            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
         }
     }
 }

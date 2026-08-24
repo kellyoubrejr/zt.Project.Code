@@ -24,6 +24,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             e.FieldKeys.Add("FFHBZSL");
             e.FieldKeys.Add("FREALQTY");
             e.FieldKeys.Add("FMaterialId");
+            e.FieldKeys.Add("FDSJJFSW");
             e.FieldKeys.Add("FXC");
         }
 
@@ -68,7 +69,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                         var entryId = Convert.ToInt64(entry["Id"]);
 
                         var materialId = Convert.ToInt64(entry["MaterialId_id"]);
-                        var materialNo = "";//Convert.ToString(materialObj?["Number"]);
+                        var materialNo = "";//!  Convert.ToString(materialObj?["Number"]);
                         var realQty = Convert.ToDecimal(entry["REALQTY"]);
 
                         if (realQty <= 0)
@@ -140,13 +141,18 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                                 continue;
                             }
 
+                            int boxedCount = 0;
                             for (int k = 0; k < serials.Count; k++)
                             {
-                                int boxNo = (int)(k / bestPerBox) + 1;
+                                if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
+                                    continue;
+                                int boxNo = (int)(boxedCount / bestPerBox) + 1;
                                 serials[k]["FXC"] = boxNo;
+                                boxedCount++;
                             }
 
-                            log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {serials.Count}个序列号分{minBoxes}箱, 每箱{bestPerBox}个");
+                            int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
+                            log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                         }
                     }
 
@@ -160,6 +166,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             }
 
             log.Section("箱次计算结束");
+        }
+
+        private static bool IsYes(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return false;
+            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
         }
 
         private static void SetRefField(DynamicObject entry, string fieldName, string idValue)
