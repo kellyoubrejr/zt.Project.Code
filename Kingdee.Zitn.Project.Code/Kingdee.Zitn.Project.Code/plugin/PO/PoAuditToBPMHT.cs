@@ -152,7 +152,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                                             LEFT JOIN T_BD_SUPPLIERBANK_L S2 ON S1.FBANKID = S2.FBANKID
                                             LEFT JOIN t_BD_SupplierFinance S3 ON S.FSUPPLIERID = S3.FSUPPLIERID
                                             LEFT JOIN t_BD_SupplierLocation S4 ON S.FSUPPLIERID = S4.FSUPPLIERID
-                                            LEFT JOIN T_BD_UNIT_L U ON B.FUNITID = U.FUNITID
+                                            LEFT JOIN T_BD_UNIT_L U ON B1.FPRICEUNITID = U.FUNITID
                                             LEFT JOIN UNW_t_Cust100015_L U1 ON M.F_PAEZ_ERPWLDJ = U1.FID
                             WHERE
                               A.FID IN ({ids})";
