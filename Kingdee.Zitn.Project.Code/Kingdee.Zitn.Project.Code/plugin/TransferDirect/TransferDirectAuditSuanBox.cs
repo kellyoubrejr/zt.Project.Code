@@ -120,7 +120,7 @@ WHERE FENTRYID = {entryId}";
                         DBUtils.Execute(this.Context, updateEntrySql);
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已回写单据体");
 
-                        var serialSql = $@"/*dialect*/SELECT FSERIALID
+                        var serialSql = $@"/*dialect*/SELECT FSERIALID, FDSJJFSW
 FROM T_STK_STKTRANSFERINSERIAL
 WHERE FENTRYID = {entryId}
 ORDER BY FSERIALID";
@@ -132,17 +132,22 @@ ORDER BY FSERIALID";
                             continue;
                         }
 
+                        int boxedCount = 0;
                         for (int k = 0; k < serials.Count; k++)
                         {
+                            if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
+                                continue;
                             long serialId = Convert.ToInt64(serials[k]["FSERIALID"]);
-                            int boxNo = (int)(k / bestPerBox) + 1;
+                            int boxNo = (int)(boxedCount / bestPerBox) + 1;
 
                             var updateSql = $@"/*dialect*/UPDATE T_STK_STKTRANSFERINSERIAL SET FXC = {boxNo}
 WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
                             DBUtils.Execute(this.Context, updateSql);
+                            boxedCount++;
                         }
 
-                        log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {serials.Count}个序列号分{minBoxes}箱, 每箱{bestPerBox}个");
+                        int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
+                        log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                     }
 
                     log.WriteLog($"{billNo} (FID={fid}) 箱次计算完成");
@@ -155,6 +160,13 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
             }
 
             log.Section("箱次计算结束");
+        }
+
+        private static bool IsYes(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return false;
+            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
         }
     }
 }
