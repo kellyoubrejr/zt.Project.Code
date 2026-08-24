@@ -26,8 +26,8 @@ namespace Kingdee.Zitn.Project.Code.conf
         /* 开发环境（沙箱） */
         private static class Dev
         {
-            public static string PartnerID     => Get("SF_PartnerID", "ZTWDZUUBNMV7");
-            public static string CheckWord     => Get("SF_CheckWord", "xKwHkfkyuI7QxIsh1mSHQbMTH2VfKz4T");
+            public static string PartnerID     => Get("SF_PartnerID", "ZTWDZ21N30S3");
+            public static string CheckWord     => Get("SF_CheckWord", "40tKLxNBerVURL3vbOkioY45M0hCUnjK");
             public static string ApiUrl        => Get("SF_ApiUrl", "https://sfapi-sbox.sf-express.com/std/service");
             public static string MonthlyCard   => Get("SF_MonthlyCard", "7551234567");
 
@@ -61,6 +61,18 @@ namespace Kingdee.Zitn.Project.Code.conf
         public static string CheckWord     => Pick(Dev.CheckWord, Prod.CheckWord);
         public static string ApiUrl        => Pick(Dev.ApiUrl, Prod.ApiUrl);
         public static string MonthlyCard   => Pick(Dev.MonthlyCard, Prod.MonthlyCard);
+
+        /// <summary>图片推送解密密钥（丰桥控制台「图片注册及推送接口」页获取的 AES 密钥）</summary>
+        public static string PictureSecret => Get("SF_PictureSecret", "");
+
+        /// <summary>图片落盘目录（接收顺丰图片推送后保存图片的物理路径）</summary>
+        public static string PictureDir    => Get("SF_PictureDir", "D:\\SFImage\\");
+
+        /// <summary>顺丰图片中转服务地址（公网可达，如 https://ziti.kingdee.com:8080）</summary>
+        public static string MiddleServiceUrl => Get("SF_MiddleServiceUrl", "");
+
+        /// <summary>顺丰图片中转服务访问令牌（与中转服务 App.config 的 token 一致）</summary>
+        public static string MiddleServiceToken => Get("SF_MiddleServiceToken", "");
 
         public static string SenderName     => Pick(Dev.SenderName, Prod.SenderName);
         public static string SenderPhone    => Pick(Dev.SenderPhone, Prod.SenderPhone);
