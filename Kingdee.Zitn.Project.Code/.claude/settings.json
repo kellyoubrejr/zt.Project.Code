@@ -26,7 +26,9 @@
       "Read(//c/Program Files/**)",
       "Read(//c/Windows/Microsoft.NET/Framework64/v4.0.30319/**)",
       "Bash(\"C:/Windows/Microsoft.NET/Framework64/v4.0.30319/MSBuild.exe\" Kingdee.Zitn.Project.Code.csproj -p:Configuration=Debug -p:OutputPath=\"C:/temp/k3build/\" -t:Build -v:minimal -nologo)",
-      "Bash(dotnet msbuild *)"
+      "Bash(dotnet msbuild *)",
+      "Bash(powershell.exe -NoProfile -Command ' *)",
+      "Read(//e/VS-github/ERP/zitn_prd_instock_button_tobpm_pluginDev/zitn_prd_instock_button_tobpm_pluginDev/**)"
     ]
   }
 }
