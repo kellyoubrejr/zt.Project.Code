@@ -7,6 +7,3 @@
 #ff0000
 
 "C:\Users\Administrator\Pictures\taylor.png"
-
-
-software
