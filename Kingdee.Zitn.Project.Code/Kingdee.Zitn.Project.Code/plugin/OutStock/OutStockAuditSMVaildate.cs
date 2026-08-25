@@ -1,4 +1,5 @@
 using Kingdee.BOS;
+using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.Bill.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
@@ -27,19 +28,10 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             if (entries == null || entries.Count == 0)
                 return;
 
-            // 读取扫码单据体，构建物料编码#序列号 集合
+            // 读取扫码单据体，解析包装序列号并反查包装箱标签，构建物料编码#序列号 集合
             var scanEntity = this.View.BusinessInfo.GetEntryEntity("F_ZMER_Entity_re5");
             var scanData = this.View.Model.GetEntityDataObject(scanEntity);
-            var scanSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (scanData != null)
-            {
-                foreach (DynamicObject scanRow in scanData)
-                {
-                    var fsmnr = Convert.ToString(scanRow["FSMNR"] ?? "").Trim();
-                    if (!string.IsNullOrEmpty(fsmnr))
-                        scanSet.Add(fsmnr);
-                }
-            }
+            var scanSet = BuildBoxScanSet(scanData);
 
             var mismatchList = new List<string>();
             bool hasMismatch = false;
@@ -79,6 +71,49 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             {
                 throw new KDBusinessException("本次发货产品与出库单不一致，请检查", "本次发货产品与出库单不一致，请检查!");
             }
+        }
+
+        /// <summary>
+        /// 解析扫码内容（P包装序列号#...），按包装序列号反查包装箱标签，返回 物料编码#序列号 集合
+        /// </summary>
+        private HashSet<string> BuildBoxScanSet(DynamicObjectCollection scanData)
+        {
+            var scanSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (scanData == null)
+                return scanSet;
+
+            foreach (DynamicObject scanRow in scanData)
+            {
+                var fsmnr = Convert.ToString(scanRow["FSMNR"] ?? "").Trim();
+                if (string.IsNullOrEmpty(fsmnr))
+                    continue;
+
+                // 取第一个#之前的包装序列号（P为固定字符）
+                var fbzxLH = fsmnr.Split('#')[0].Trim();
+                if (string.IsNullOrEmpty(fbzxLH))
+                    continue;
+
+                // 反查包装箱标签，取包含的物料+序列号
+                var sql = string.Format(
+                    "/*dialect*/SELECT B.FWLNUM, B.FXLH FROM ZMER_t_Cust100031 A " +
+                    "INNER JOIN ZMER_t_Cust_Entry100089 B ON A.FID = B.FID " +
+                    "WHERE A.FBZXLH = '{0}'",
+                    fbzxLH.Replace("'", "''"));
+
+                var dt = DBUtils.ExecuteDynamicObject(this.Context, sql);
+                if (dt == null || dt.Count == 0)
+                    continue;
+
+                for (int j = 0; j < dt.Count; j++)
+                {
+                    var wlnum = Convert.ToString(dt[j]["FWLNUM"] ?? "").Trim();
+                    var xlh = Convert.ToString(dt[j]["FXLH"] ?? "").Trim();
+                    if (!string.IsNullOrEmpty(wlnum))
+                        scanSet.Add(wlnum + "#" + xlh);
+                }
+            }
+
+            return scanSet;
         }
     }
 }
