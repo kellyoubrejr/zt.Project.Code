@@ -71,24 +71,34 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 for (int i = 0; i < collection.Count; i++)
                 {
                     var syb = Convert.ToString(collection[i]["FCPSYB"]);
-                    if(syb != "")
+
+                    if (string.IsNullOrWhiteSpace(syb))
                     {
-                        _log.WriteLog($"FID={ids}，事业部已存在，跳过更新");
-                        continue;
+                        //var updateQuery = string.Format(@"
+                        //                                                    UPDATE A
+                        //                        SET A.FCPSYB = (
+                        //                            SELECT TOP 1 B.F_PAEZ_SYB 
+                        //                            FROM T_BD_MATERIAL B 
+                        //                            WHERE B.FMATERIALID = A.FMATERIALID
+                        //                        )
+                        //                        FROM T_PRD_INSTOCKENTRY A
+                        //                        WHERE A.FID IN ({0})", ids);
+                        var updateQuery = string.Format(@"
+    UPDATE T_PRD_INSTOCKENTRY 
+    SET FCPSYB = (
+        SELECT TOP 1 B.F_PAEZ_SYB 
+        FROM T_BD_MATERIAL B 
+        WHERE B.FMATERIALID = T_PRD_INSTOCKENTRY.FMATERIALID
+    )
+    WHERE FID IN ({0})", ids);
+                        DbUtils.Execute(this.Context, updateQuery);
+                        _log.WriteLog($"FID={ids}，事业部为空，已更新");
                     }
                     else
                     {
-                        var updateQuery = string.Format(@"
-                                                                            UPDATE A
-                                                SET A.FCFSYB = (
-                                                    SELECT TOP 1 B.F_PAEZ 
-                                                    FROM T_BD_MATERIAL B 
-                                                    WHERE B.FMATERIALID = A.FMATERIALID
-                                                )
-                                                FROM T_PRD_INSTOCKENTRY A
-                                                WHERE A.FID IN ({0})", ids);
-                        DbUtils.Execute(this.Context,updateQuery);
+                        _log.WriteLog($"FID={ids}，事业部已存在-{syb}-，跳过更新");
                     }
+                    
                 }
 
 
