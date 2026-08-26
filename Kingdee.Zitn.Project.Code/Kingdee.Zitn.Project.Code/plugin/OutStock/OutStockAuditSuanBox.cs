@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 {
@@ -24,8 +25,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             e.FieldKeys.Add("FFHBZSL");
             e.FieldKeys.Add("FREALQTY");
             e.FieldKeys.Add("FMaterialId");
-            e.FieldKeys.Add("FDSJJFSW");
+            e.FieldKeys.Add("FDSJSFJFSW");
             e.FieldKeys.Add("FXC");
+            e.FieldKeys.Add("FSerialNo");
         }
 
         public override void BeginOperationTransaction(BeginOperationTransactionArgs e)
@@ -62,6 +64,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                 try
                 {
                     log.WriteLog($"开始处理: {billNo}, FID={fid}");
+
+                    var groupBoxOffset = new Dictionary<string, int>();
 
                     for (int i = 0; i < entries.Count; i++)
                     {
@@ -132,6 +136,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已设置到单据体");
 
+                        var groupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
+                        int boxOffset = groupBoxOffset.TryGetValue(groupKey, out var existingOffset) ? existingOffset : 0;
+
                         if (!string.IsNullOrEmpty(serialPropName))
                         {
                             var serials = entry[serialPropName] as DynamicObjectCollection;
@@ -141,17 +148,21 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                                 continue;
                             }
 
+                            var delivered = serials
+                                .Where(s => !IsNo(Convert.ToString(s["FDSJSFJFSW"])))
+                                .OrderByDescending(s => SerialSortKey(Convert.ToString(s["SerialNo"] ?? "")), StringComparer.Ordinal)
+                                .ToList();
+
                             int boxedCount = 0;
-                            for (int k = 0; k < serials.Count; k++)
+                            for (int k = 0; k < delivered.Count; k++)
                             {
-                                if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
-                                    continue;
-                                int boxNo = (int)(boxedCount / bestPerBox) + 1;
-                                serials[k]["FXC"] = boxNo;
+                                int boxNo = boxOffset + (int)(boxedCount / bestPerBox) + 1;
+                                delivered[k]["FXC"] = boxNo;
                                 boxedCount++;
                             }
 
                             int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
+                            groupBoxOffset[groupKey] = boxOffset + actualBoxes;
                             log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                         }
                     }
@@ -168,11 +179,16 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
             log.Section("箱次计算结束");
         }
 
-        private static bool IsYes(string s)
+        private static string SerialSortKey(string serialNo)
         {
-            if (string.IsNullOrEmpty(s))
-                return false;
-            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
+            if (string.IsNullOrEmpty(serialNo))
+                return serialNo;
+            return Regex.Replace(serialNo, @"\d+", m => m.Value.PadLeft(20, '0'));
+        }
+
+        private static bool IsNo(string s)
+        {
+            return s == "否";
         }
 
         private static void SetRefField(DynamicObject entry, string fieldName, string idValue)
