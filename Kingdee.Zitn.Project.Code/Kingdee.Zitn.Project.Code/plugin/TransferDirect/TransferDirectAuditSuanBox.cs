@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
 {
@@ -35,6 +36,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                 try
                 {
                     log.WriteLog($"开始处理: {billNo}, FID={fid}");
+
+                    var groupBoxOffset = new Dictionary<string, int>();
 
                     var entrySql = $@"/*dialect*/SELECT E.FENTRYID,  E.FMATERIALID, M.FNUMBER AS FMATERIALNO, E.FQTY
 FROM T_STK_STKTRANSFERIN H
@@ -120,10 +123,13 @@ WHERE FENTRYID = {entryId}";
                         DBUtils.Execute(this.Context, updateEntrySql);
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已回写单据体");
 
-                        var serialSql = $@"/*dialect*/SELECT FSERIALID, FDSJJFSW
-FROM T_STK_STKTRANSFERINSERIAL
-WHERE FENTRYID = {entryId}
-ORDER BY FSERIALID";
+                        var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
+                        int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+
+                        var serialSql = $@"/*dialect*/SELECT T1.FSERIALID, T1.FDSJJFSW, A.FNUMBER AS FSERIALNO
+FROM T_STK_STKTRANSFERINSERIAL T1
+LEFT JOIN T_BD_SERIALMASTER A ON T1.FSERIALID = A.FSERIALID
+WHERE T1.FENTRYID = {entryId}";
 
                         var serials = DBUtils.ExecuteDynamicObject(this.Context, serialSql);
                         if (serials == null || serials.Count == 0)
@@ -132,13 +138,16 @@ ORDER BY FSERIALID";
                             continue;
                         }
 
+                        var delivered = serials
+                            .Where(s => !IsNo(Convert.ToString(s["FDSJJFSW"])))
+                            .OrderByDescending(s => SerialSortKey(Convert.ToString(s["FSERIALNO"] ?? "")), StringComparer.Ordinal)
+                            .ToList();
+
                         int boxedCount = 0;
-                        for (int k = 0; k < serials.Count; k++)
+                        for (int k = 0; k < delivered.Count; k++)
                         {
-                            if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
-                                continue;
-                            long serialId = Convert.ToInt64(serials[k]["FSERIALID"]);
-                            int boxNo = (int)(boxedCount / bestPerBox) + 1;
+                            long serialId = Convert.ToInt64(delivered[k]["FSERIALID"]);
+                            int boxNo = boxOffset + (int)(boxedCount / bestPerBox) + 1;
 
                             var updateSql = $@"/*dialect*/UPDATE T_STK_STKTRANSFERINSERIAL SET FXC = {boxNo}
 WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
@@ -147,6 +156,7 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
                         }
 
                         int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
+                        groupBoxOffset[boxGroupKey] = boxOffset + actualBoxes;
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                     }
 
@@ -162,11 +172,16 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
             log.Section("箱次计算结束");
         }
 
-        private static bool IsYes(string s)
+        private static string SerialSortKey(string serialNo)
         {
-            if (string.IsNullOrEmpty(s))
-                return false;
-            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
+            if (string.IsNullOrEmpty(serialNo))
+                return serialNo;
+            return Regex.Replace(serialNo, @"\d+", m => m.Value.PadLeft(20, '0'));
+        }
+
+        private static bool IsNo(string s)
+        {
+            return s == "否";
         }
     }
 }

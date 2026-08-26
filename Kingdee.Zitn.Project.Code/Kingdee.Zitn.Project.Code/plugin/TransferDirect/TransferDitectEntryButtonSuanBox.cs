@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
 {
@@ -33,6 +34,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                 var entries = this.View.Model.GetEntityDataObject(entryEntity);
                 if (entries == null || entries.Count == 0)
                     return;
+
+                var groupBoxOffset = new Dictionary<string, int>();
 
                 for (int i = 0; i < entries.Count; i++)
                 {
@@ -85,6 +88,9 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                     log.WriteLog($"  第{i + 1}行 物料{materialNo} 数量={qty}, 最优: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
 
+                    var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
+                    int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+
                     this.View.Model.SetValue("FFHBZLB", best.FFHBZLB, i);
                     this.View.Model.SetValue("FFHBZSL", bestPerBox, i);
                     this.View.Model.SetValue("FFHBZGG", best.FFHBZGG, i);
@@ -95,15 +101,21 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                         var serials = entries[i][serialPropName] as DynamicObjectCollection;
                         if (serials != null && serials.Count > 0)
                         {
+                            var delivered = serials
+                                .Where(s => !IsNo(Convert.ToString(s["FDSJJFSW"])))
+                                .OrderByDescending(s => SerialSortKey(Convert.ToString(s["SerialNo"] ?? "")), StringComparer.Ordinal)
+                                .ToList();
+
                             int boxedCount = 0;
-                            for (int k = 0; k < serials.Count; k++)
+                            for (int k = 0; k < delivered.Count; k++)
                             {
-                                if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
-                                    continue;
-                                int boxNo = (int)(boxedCount / bestPerBox) + 1;
-                                serials[k]["FXC"] = boxNo;
+                                int boxNo = boxOffset + (int)(boxedCount / bestPerBox) + 1;
+                                delivered[k]["FXC"] = boxNo;
                                 boxedCount++;
                             }
+
+                            int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
+                            groupBoxOffset[boxGroupKey] = boxOffset + actualBoxes;
                         }
                     }
                 }
@@ -146,6 +158,8 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                     log.WriteLog("无分录数据，跳过");
                     return;
                 }
+
+                var groupBoxOffset = new Dictionary<string, int>();
 
                 for (int i = 0; i < entries.Count; i++)
                 {
@@ -190,6 +204,9 @@ WHERE FCP = '{materialId}'
 
                     log.WriteLog($"  第{i + 1}行 物料{materialNo} 数量={qty}, 匹配规格: {ffhbzlb}/{ffhbzgg}, 每箱{ffhbzsl}");
 
+                    var boxGroupKey = $"{ffhbzlb}|{ffhbzgg}|{fscbzgg}";
+                    int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+
                     var serials = entries[i][serialPropName] as DynamicObjectCollection;
                     if (serials == null || serials.Count == 0)
                     {
@@ -197,17 +214,21 @@ WHERE FCP = '{materialId}'
                         continue;
                     }
 
+                    var delivered = serials
+                        .Where(s => !IsNo(Convert.ToString(s["FDSJJFSW"])))
+                        .OrderByDescending(s => SerialSortKey(Convert.ToString(s["SerialNo"] ?? "")), StringComparer.Ordinal)
+                        .ToList();
+
                     int boxedCount = 0;
-                    for (int k = 0; k < serials.Count; k++)
+                    for (int k = 0; k < delivered.Count; k++)
                     {
-                        if (!IsYes(Convert.ToString(serials[k]["FDSJJFSW"])))
-                            continue;
-                        int boxNo = (int)(boxedCount / ffhbzsl) + 1;
-                        serials[k]["FXC"] = boxNo;
+                        int boxNo = boxOffset + (int)(boxedCount / ffhbzsl) + 1;
+                        delivered[k]["FXC"] = boxNo;
                         boxedCount++;
                     }
 
                     int totalBoxes = (int)Math.Ceiling(boxedCount / ffhbzsl);
+                    groupBoxOffset[boxGroupKey] = boxOffset + totalBoxes;
                     log.WriteLog($"  第{i + 1}行 物料{materialNo} 箱次重新分配完成: {boxedCount}/{serials.Count}个序列号分{totalBoxes}箱, 每箱{ffhbzsl}个");
                 }
 
@@ -223,11 +244,16 @@ WHERE FCP = '{materialId}'
             log.Section("手工算箱结束");
         }
 
-        private static bool IsYes(string s)
+        private static string SerialSortKey(string serialNo)
         {
-            if (string.IsNullOrEmpty(s))
-                return false;
-            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "是" || s == "Y";
+            if (string.IsNullOrEmpty(serialNo))
+                return serialNo;
+            return Regex.Replace(serialNo, @"\d+", m => m.Value.PadLeft(20, '0'));
+        }
+
+        private static bool IsNo(string s)
+        {
+            return s == "否";
         }
     }
 }
