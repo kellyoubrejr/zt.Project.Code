@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -o \"/e/mes/21_SupplierReport/SupplierReport/ZTCloud/bin/Debug/Scripts/mammoth.browser.min.js\" \"https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js\")",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Professional/MSBuild/Current/Bin/MSBuild.exe\" SupplierReport.sln /t:Build /p:Configuration=Debug)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)"
+    ]
+  }
+}

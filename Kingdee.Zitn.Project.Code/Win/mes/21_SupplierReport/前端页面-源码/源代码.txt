@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>供应商月度趋势分析系统 v4.6.4 | 青岛智腾微电子</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root { --bg: #f0f2f6; --card-bg: #ffffff; --primary: #0b2b4f; --accent: #1e6f3f; --accent2: #2c6e9e; --warning: #ffb347; --danger: #d32f2f; --border: #e2e8f0; --text: #1e293b; --radius: 20px; --shadow: 0 4px 16px rgba(0,0,0,0.06); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); font-family: 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif; padding: 24px 20px; color: var(--text); }
+        .container { max-width: 1700px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #0b2b4f, #123e6a); color: white; padding: 22px 32px; border-radius: 24px; margin-bottom: 24px; position: relative; }
+        .header h1 { font-size: 1.7rem; }
+        .version { position: absolute; top: 22px; right: 32px; background: rgba(255,255,255,0.18); padding: 5px 14px; border-radius: 40px; font-size: 0.78rem; }
+        .card { background: var(--card-bg); border-radius: var(--radius); padding: 18px 24px; margin-bottom: 24px; box-shadow: var(--shadow); border: 1px solid #eef2f6; }
+        .upload-box { flex:1; min-width:320px; background:#f8fafc; border-radius:16px; padding:16px; border:2px dashed #cbd5e1; }
+        .btn { border:none; padding:10px 24px; border-radius:40px; cursor:pointer; font-weight:600; font-size:0.9rem; }
+        .btn-generate { background:#1e6f3f; color:white; }
+        .chart-box { background:#fff; border-radius:16px; padding:12px; border:1px solid #eef2f6; margin-bottom:16px; }
+        table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+        th { background:#eef2ff; padding:6px 5px; font-weight:700; }
+        td { padding:6px 5px; border-bottom:1px solid #e2e8f0; text-align:center; }
+        .pdf-page { page-break-before:always; page-break-inside:avoid; }
+        .pdf-page:first-of-type { page-break-before:avoid; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-item { background: #f1f5f9; border-radius: 16px; padding: 12px 10px; text-align: center; border: 1px solid #e2e8f0; }
+        .stat-value { font-size: 1.5rem; font-weight: 800; color: #0f3b5f; }
+        .stat-label { font-size: 0.72rem; color: #64748b; margin-top: 4px; }
+        .highlight-box { background: #f8fafc; border-radius: 14px; padding: 12px; border: 1px solid #e2e8f0; margin-bottom:16px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📊 供应商月度趋势分析系统</h1>
+        <div class="dept">青岛智腾微电子有限公司 · 质量工艺管理部</div>
+        <div style="font-size:0.82rem; margin-top:6px;">2025年月平均基准 vs 2026年月度趋势 · 供应商类别自动识别</div>
+        <div class="version">v4.6.4</div>
+    </div>
+    <div class="card">
+        <div class="card-title">📥 数据导入</div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+            <div class="upload-box"><label>2025年全年数据</label><input type="file" id="file2025" accept=".xlsx,.xls,.csv"><div id="status2025"></div></div>
+            <div class="upload-box"><label>2026年各月（可多选）</label><input type="file" id="files2026" accept=".xlsx,.xls,.csv" multiple><div id="status2026"></div></div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:12px;">
+            <button id="btnGenerate" class="btn btn-generate">🚀 生成报告</button>
+            <button id="btnExportPdf" class="btn" style="background:#b85c1a;color:white;">📄 导出PDF</button>
+            <button id="btnExportExcel" class="btn" style="background:#2c6e9e;color:white;">📎 导出Excel</button>
+            <button id="btnReset" class="btn" style="background:#e2e8f0;">🔄 清空</button>
+        </div>
+        <div id="globalMsg"></div>
+    </div>
+
+    <div id="reportContainer" style="display:none;">
+        <!-- 第一页：概览 + 总体趋势图表 + 表格 -->
+        <div class="card pdf-page">
+            <div style="display:flex;justify-content:space-between;align-items:center; margin-bottom:10px;">
+                <div><b>智腾微电子有限公司</b></div>
+                <div><span id="reportTitleLabel" style="background:#e9ecef;padding:4px 16px;border-radius:40px;"></span></div>
+            </div>
+            <div class="stat-grid" id="summaryStats"></div>
+            <div id="latestHighlight" class="highlight-box"></div>
+            <div class="chart-box">
+                <div class="chart-title">📈 总体趋势：2025月平均 vs 2026各月</div>
+                <div id="overallTrendChart" style="height:342px;"></div>
+            </div>
+            <div id="overallTrendTable" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- 第二页：各类别批次合格率趋势图表 + 表格 -->
+        <div class="card pdf-page">
+            <div class="chart-box">
+                <div class="chart-title">📊 各类别批次合格率趋势（2025月均虚线）</div>
+                <div id="categoryBatchTrendChart" style="height:342px;"></div>
+            </div>
+            <div id="categoryBatchTrendTable"></div>
+        </div>
+
+        <!-- 第三页：各类别数量合格率趋势图表 + 表格 -->
+        <div class="card pdf-page">
+            <div class="chart-box">
+                <div class="chart-title">📊 各类别数量合格率趋势（2025月均虚线）</div>
+                <div id="categoryQtyTrendChart" style="height:342px;"></div>
+            </div>
+            <div id="categoryQtyTrendTable"></div>
+        </div>
+
+        <!-- 第四页：机加工供应商趋势（两个图表） -->
+        <div class="card pdf-page">
+            <div class="chart-box">
+                <div class="chart-title">🔧 机加工供应商月度批次合格率对比（2025 vs 2026）</div>
+                <div id="machiningBatchChart" style="height:306px;"></div>
+            </div>
+            <div class="chart-box" style="margin-top:10px;">
+                <div class="chart-title">🔧 机加工供应商月度数量合格率对比</div>
+                <div id="machiningQtyChart" style="height:306px;"></div>
+            </div>
+        </div>
+
+        <!-- 第五页：表格一 + 表格二 -->
+        <div class="card pdf-page">
+            <div class="chart-title">📋 表格一：各类别最新月份汇总</div>
+            <div id="categoryLatestTable"></div>
+            <div class="chart-title" style="margin-top:24px;">📋 表格二：各类别汇总（2025月均+2026各月+至今平均）</div>
+            <div id="categoryFullTable" style="overflow-x:auto;"></div>
+        </div>
+    </div>
+    <footer>青岛智腾微电子 · 供应商月度趋势分析系统 v4.6.4</footer>
+</div>
+
+<script>
+(function() {
+    const VERSION = 'v4.6.4';
+    const CAT_MAP = new Map([
+        ['LS01','临时供应商'],['WX13','基片供应商'],['WX14','管壳供应商'],['WX15','传感器供应商'],
+        ['WX16','机加工供应商'],['WX17','PCB供应商'],['WX19','加表供应商'],['WX20','芯片供应商'],
+        ['ZC01','集成电路供应商'],['ZC02','芯片供应商'],['ZC03','敏感器件供应商'],['ZC06','元器件供应商'],['ZC07','连接器供应商']
+    ]);
+    const IGNORE_CATEGORIES = new Set(['加表供应商']);
+    function getCat(code) { const p = String(code||'').trim().substring(0,4); return CAT_MAP.get(p)||'其他/未分类'; }
+    function isQual(s) { return ['合格','pass','ok','合格品'].includes(String(s||'').trim().toLowerCase()); }
+
+    const FIELD_ALIASES = {
+        supplierCode: ['供应商编码', '供应商代码', 'supplier_code'],
+        name: ['供应商名称', 'supplier_name', '名称'],
+        inspectQty: ['检验数量', '总数量', '数量', '来料数量', 'inspect_qty'],
+        batchNo: ['批号', '批次号', 'batch_no'],
+        startDate: ['检验开始日期', '开始日期'],
+        endDate: ['检验结束日期', '结束日期', '检验完成日期'],
+        defectQty: ['不合格数', '不良数', '不合格数量', 'defect_qty'],
+        status: ['状态', '判定', 'status'],
+        decision: ['使用决策备注', '决策备注', '备注']
+    };
+    function getField(row, aliases) {
+        for (let key of aliases) if (row[key] !== undefined && row[key] !== '') return row[key];
+        return '';
+    }
+
+    function parseMonthFromFilename(filename) {
+        const m1 = filename.match(/26\.(\d{1,2})月/);
+        if (m1) return `2026-${String(parseInt(m1[1])).padStart(2,'0')}`;
+        const m2 = filename.match(/2026[年\-](\d{1,2})/);
+        if (m2) return `2026-${String(parseInt(m2[1])).padStart(2,'0')}`;
+        return null;
+    }
+
+    function merge618(rows) {
+        const normal = [], special = [];
+        for (let r of rows) {
+            const code = String(getField(r, FIELD_ALIASES.supplierCode)).trim();
+            (code === '618所' || code === '618' ? special : normal).push(r);
+        }
+        if (!special.length) return rows;
+        const grp = new Map();
+        for (let r of special) {
+            const key = getField(r, ['批号','batch_no'])?.trim() || getField(r, FIELD_ALIASES.endDate)?.trim() || 'def_'+Math.random();
+            if (!grp.has(key)) grp.set(key, {...r, 检验数量:0, 不合格数:0, rows:[]});
+            const g = grp.get(key);
+            g.检验数量 = (Number(g.检验数量)||0) + (Number(r.检验数量)||0);
+            g.不合格数 = (Number(g.不合格数)||0) + (Number(r.不合格数)||0);
+            g.rows.push(r);
+            g.状态 = g.不合格数 > 0 ? '不合格' : '合格';
+        }
+        return [...normal, ...Array.from(grp.values()).map(g => { const {rows,...rest}=g; return rest; })];
+    }
+
+    function computeStats(rows) {
+        const map = new Map();
+        for (let r of rows) {
+            const code = String(getField(r, FIELD_ALIASES.supplierCode)).trim();
+            if (!code) continue;
+            const qty = Math.floor(Number(getField(r, FIELD_ALIASES.inspectQty)) || 0);
+            const defect = Math.floor(Number(getField(r, FIELD_ALIASES.defectQty)) || 0);
+            const statusVal = getField(r, FIELD_ALIASES.status);
+            const qual = isQual(statusVal);
+            const name = getField(r, FIELD_ALIASES.name) || code;
+            if (!map.has(code)) map.set(code, {code,name,totalQty:0,qualQty:0,batch:0,qualBatch:0,cat:getCat(code)});
+            const s = map.get(code);
+            s.totalQty += qty;
+            s.qualQty += (qty - defect);
+            s.batch++;
+            if (qual) s.qualBatch++;
+            if (name !== code && s.name === code) s.name = name;
+        }
+        const suppliers = Array.from(map.values()).map(s => ({
+            ...s,
+            batchQualRate: s.batch ? s.qualBatch/s.batch : 0,
+            qtyQualRate: s.totalQty ? s.qualQty/s.totalQty : 0,
+        }));
+        const tb = suppliers.reduce((a,s)=>a+s.batch,0), tq = suppliers.reduce((a,s)=>a+s.totalQty,0);
+        const tqb = suppliers.reduce((a,s)=>a+s.qualBatch,0), tqq = suppliers.reduce((a,s)=>a+s.qualQty,0);
+        return { suppliers, totalBatch:tb, totalQty:tq, totalQualBatch:tqb, totalQualQty:tqq,
+            overallBatchQualRate: tb?tqb/tb:0, overallQtyQualRate: tq?tqq/tq:0 };
+    }
+
+    function catStats(suppliers) {
+        const m = new Map();
+        for (let s of suppliers) {
+            const cat = s.cat;
+            if (IGNORE_CATEGORIES.has(cat)) continue;
+            if (!m.has(cat)) m.set(cat, {cat, tb:0, tq:0, qb:0, qq:0});
+            const o = m.get(cat);
+            o.tb += s.batch; o.tq += s.totalQty; o.qb += s.qualBatch; o.qq += s.qualQty;
+        }
+        return Array.from(m.values()).map(o => ({
+            ...o,
+            batchQualRate: o.tb?o.qb/o.tb:0,
+            qtyQualRate: o.tq?o.qq/o.tq:0,
+        }));
+    }
+
+    let raw2025=[], raw2026ByMonth=new Map(), latestMonth=null, reportData=null;
+
+    async function loadFile(file) {
+        const data = await new Promise((res,rej)=>{
+            const r = new FileReader();
+            r.onload = e => { const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array'}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})); };
+            r.onerror = rej; r.readAsArrayBuffer(file);
+        });
+        if (!data.length) throw new Error('文件无数据');
+        return data;
+    }
+
+    document.getElementById('file2025').addEventListener('change', async function(){
+        const f=this.files[0]; if(!f){raw2025=[]; return;}
+        try{ raw2025 = merge618(await loadFile(f)); document.getElementById('status2025').innerHTML='✅ 2025数据已加载'; }
+        catch(e){ raw2025=[]; document.getElementById('status2025').innerHTML='❌ '+e.message; }
+    });
+    document.getElementById('files2026').addEventListener('change', async function(){
+        raw2026ByMonth.clear(); const files=Array.from(this.files); let total=0, errors=[];
+        for (let file of files) {
+            try {
+                const data = merge618(await loadFile(file));
+                const month = parseMonthFromFilename(file.name);
+                if (!month) { errors.push(`${file.name}: 无法识别月份`); continue; }
+                if (!raw2026ByMonth.has(month)) raw2026ByMonth.set(month, []);
+                raw2026ByMonth.get(month).push(...data);
+                total += data.length;
+            } catch(e) { errors.push(`${file.name}: ${e.message}`); }
+        }
+        const months = [...raw2026ByMonth.keys()].sort();
+        latestMonth = months.length ? months[months.length-1] : null;
+        let msg = months.length ? `✅ 已加载 ${months.length} 个月份，共${total}条。` : '';
+        if (errors.length) msg += '<br>⚠️ ' + errors.join('<br>');
+        document.getElementById('status2026').innerHTML = msg || '未加载数据';
+    });
+
+    function compute2025Avg() {
+        const groups = new Map();
+        for (let r of raw2025) {
+            let dateStr = getField(r, FIELD_ALIASES.endDate);
+            if (!dateStr) dateStr = getField(r, ['单据日期', '检验开始日期']);
+            if (!dateStr) continue;
+            const ymMatch = String(dateStr).match(/(\d{4})[-/年](\d{1,2})/);
+            if (!ymMatch || ymMatch[1] !== '2025') continue;
+            const ym = `${ymMatch[1]}-${ymMatch[2].padStart(2,'0')}`;
+            if (!groups.has(ym)) groups.set(ym, []);
+            groups.get(ym).push(r);
+        }
+        if (groups.size === 0) return null;
+        const monthStats = [];
+        for (let [ym, rows] of groups) monthStats.push({month:ym, ...computeStats(rows), catStats:catStats(computeStats(rows).suppliers)});
+        const n = monthStats.length;
+        const avgB = monthStats.reduce((a,m)=>a+m.overallBatchQualRate,0)/n;
+        const avgQ = monthStats.reduce((a,m)=>a+m.overallQtyQualRate,0)/n;
+        const catMap = new Map();
+        for (let m of monthStats) for (let c of m.catStats) {
+            if (IGNORE_CATEGORIES.has(c.cat)) continue;
+            if (!catMap.has(c.cat)) catMap.set(c.cat, []);
+            catMap.get(c.cat).push({b:c.batchQualRate, q:c.qtyQualRate});
+        }
+        const catAvg = [];
+        for (let [cat, rates] of catMap) catAvg.push({
+            cat,
+            avgB: rates.reduce((a,r)=>a+r.b,0)/rates.length,
+            avgQ: rates.reduce((a,r)=>a+r.q,0)/rates.length,
+        });
+        return { monthStats, avgB, avgQ, catAvg };
+    }
+
+    function runAnalysis() {
+        const a2025 = raw2025.length ? compute2025Avg() : null;
+        const m2026 = [...raw2026ByMonth.keys()].sort();
+        const monthly2026 = m2026.map(m => {
+            const stats = computeStats(raw2026ByMonth.get(m));
+            return { month:m, ...stats, catStats:catStats(stats.suppliers) };
+        });
+        const latest = m2026[m2026.length-1] || null;
+        const latestStats = latest ? monthly2026.find(x=>x.month===latest) : null;
+        const all2026Rows = [];
+        for (let rows of raw2026ByMonth.values()) all2026Rows.push(...rows);
+        const overall2026 = all2026Rows.length ? computeStats(all2026Rows) : null;
+        const overall2026Cat = overall2026 ? catStats(overall2026.suppliers).filter(c => !IGNORE_CATEGORIES.has(c.cat) && c.tb>0) : [];
+        const allCats = new Set();
+        if (a2025) a2025.catAvg.forEach(c => { if (!IGNORE_CATEGORIES.has(c.cat)) allCats.add(c.cat); });
+        monthly2026.forEach(m => m.catStats.forEach(c => { if (!IGNORE_CATEGORIES.has(c.cat) && c.tb>0) allCats.add(c.cat); }));
+        overall2026Cat.forEach(c => allCats.add(c.cat));
+        const sortedCats = [...allCats].sort();
+        const catTrend = {};
+        for (let cat of sortedCats) {
+            catTrend[cat] = { avg2025B:null, avg2025Q:null, months:{} };
+            if (a2025) {
+                const ca = a2025.catAvg.find(c=>c.cat===cat);
+                if (ca) { catTrend[cat].avg2025B = ca.avgB; catTrend[cat].avg2025Q = ca.avgQ; }
+            }
+            for (let m of monthly2026) {
+                const cs = m.catStats.find(c=>c.cat===cat);
+                if (cs) catTrend[cat].months[m.month] = { b:cs.batchQualRate, q:cs.qtyQualRate };
+            }
+        }
+        return { a2025, monthly2026, m2026, latest, latestStats, overall2026, overall2026Cat, sortedCats, catTrend };
+    }
+
+    function renderReport(d) {
+        reportData = d;
+        document.getElementById('reportContainer').style.display='block';
+        const { a2025, monthly2026, m2026, latest, latestStats, overall2026Cat, sortedCats, catTrend } = d;
+        document.getElementById('reportTitleLabel').textContent = `${latest?.replace('2026-','2026年')}月 趋势报告`;
+
+        let cards = '';
+        if (latestStats) {
+            cards += `<div class="stat-item"><div class="stat-value">${latestStats.totalBatch}</div><div class="stat-label">${latest}总批次</div></div>`;
+            cards += `<div class="stat-item"><div class="stat-value">${latestStats.totalQty.toLocaleString()}</div><div class="stat-label">总数量</div></div>`;
+            cards += `<div class="stat-item"><div class="stat-value">${(latestStats.overallBatchQualRate*100).toFixed(1)}%</div><div class="stat-label">批次合格率</div></div>`;
+            cards += `<div class="stat-item"><div class="stat-value">${(latestStats.overallQtyQualRate*100).toFixed(1)}%</div><div class="stat-label">数量合格率</div></div>`;
+        }
+        if (a2025) {
+            cards += `<div class="stat-item" style="background:#fef9e6;"><div class="stat-value">${(a2025.avgB*100).toFixed(1)}%</div><div class="stat-label">2025月均批次合格率</div></div>`;
+            cards += `<div class="stat-item" style="background:#fef9e6;"><div class="stat-value">${(a2025.avgQ*100).toFixed(1)}%</div><div class="stat-label">2025月均数量合格率</div></div>`;
+        }
+        document.getElementById('summaryStats').innerHTML = cards;
+        if (latestStats && a2025) {
+            const db = (latestStats.overallBatchQualRate - a2025.avgB)*100;
+            const dq = (latestStats.overallQtyQualRate - a2025.avgQ)*100;
+            document.getElementById('latestHighlight').innerHTML = `📌 ${latest} vs 2025月平均：批次合格率 <b style="color:${db>=0?'#166534':'#991b1b'}">${db>=0?'↑':'↓'}${Math.abs(db).toFixed(1)}个百分点</b>，数量合格率 <b style="color:${dq>=0?'#166534':'#991b1b'}">${dq>=0?'↑':'↓'}${Math.abs(dq).toFixed(1)}个百分点</b>`;
+        } else {
+            document.getElementById('latestHighlight').innerHTML = '';
+        }
+
+        renderOverall(a2025, monthly2026, m2026);
+        renderCategoryTrend(a2025, monthly2026, m2026, sortedCats, catTrend);
+        renderCatLatest(latestStats);
+        renderCatFull(a2025, monthly2026, m2026, overall2026Cat, sortedCats, catTrend);
+        renderMachiningTrend(a2025, monthly2026, m2026);
+    }
+
+    function renderOverall(a2025, monthly, months) {
+        const dom = document.getElementById('overallTrendChart');
+        if (dom) { const inst = echarts.getInstanceByDom(dom); if (inst) inst.dispose(); }
+        const chart = echarts.init(dom);
+        const monthLabels = months.map(m => m.replace('2026-','')+'月');
+        const batchData = months.map(m => { const s = monthly.find(x=>x.month===m); return s?+(s.overallBatchQualRate*100).toFixed(1):null; });
+        const qtyData = months.map(m => { const s = monthly.find(x=>x.month===m); return s?+(s.overallQtyQualRate*100).toFixed(1):null; });
+        if (a2025) {
+            monthLabels.push('2025月平均');
+            batchData.push(+(a2025.avgB*100).toFixed(1));
+            qtyData.push(+(a2025.avgQ*100).toFixed(1));
+        }
+        chart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['批次合格率(%)', '数量合格率(%)'] },
+            xAxis: { data: monthLabels, axisLabel: { rotate: 30 } },
+            yAxis: { name: '合格率(%)', max: 100 },
+            series: [
+                { name: '批次合格率(%)', type: 'bar', data: batchData, color: '#3498db', label: { show: true, position: 'top' } },
+                { name: '数量合格率(%)', type: 'line', data: qtyData, color: '#2ecc71', symbol: 'circle', lineStyle: { width: 2 }, label: { show: true, position: 'top' } }
+            ],
+            grid: { containLabel: true }
+        });
+        let tbl = '<table><thead><tr><th>月份</th><th>总批次</th><th>合格批次</th><th>总数量</th><th>合格数量</th><th>批次合格率</th><th>数量合格率</th></tr></thead><tbody>';
+        for (let m of monthly) {
+            tbl += `<tr><td>${m.month.replace('2026-','')}月</td><td>${m.totalBatch}</td><td>${m.totalQualBatch}</td><td>${m.totalQty.toLocaleString()}</td><td>${m.totalQualQty.toLocaleString()}</td><td>${(m.overallBatchQualRate*100).toFixed(1)}%</td><td>${(m.overallQtyQualRate*100).toFixed(1)}%</td></tr>`;
+        }
+        if (a2025) {
+            const tB = a2025.monthStats.reduce((a,m)=>a+m.totalBatch,0);
+            const tQB = a2025.monthStats.reduce((a,m)=>a+m.totalQualBatch,0);
+            const tQ = a2025.monthStats.reduce((a,m)=>a+m.totalQty,0);
+            const tQQ = a2025.monthStats.reduce((a,m)=>a+m.totalQualQty,0);
+            tbl += `<tr style="background:#fef9e6;font-weight:bold;"><td>2025月平均</td><td>${tB}</td><td>${tQB}</td><td>${tQ.toLocaleString()}</td><td>${tQQ.toLocaleString()}</td><td>${(a2025.avgB*100).toFixed(1)}%</td><td>${(a2025.avgQ*100).toFixed(1)}%</td></tr>`;
+        }
+        tbl += '</tbody></table>';
+        document.getElementById('overallTrendTable').innerHTML = tbl;
+    }
+
+    function renderCategoryTrend(a2025, monthly, months, sortedCats, catTrend) {
+        const batchDom = document.getElementById('categoryBatchTrendChart');
+        if (batchDom) { const inst = echarts.getInstanceByDom(batchDom); if (inst) inst.dispose(); }
+        const batchChart = echarts.init(batchDom);
+        const seriesBatch = [];
+        months.forEach(m => {
+            seriesBatch.push({
+                name: m.replace('2026-','')+'月批次',
+                type: 'bar',
+                data: sortedCats.map(cat => {
+                    const v = catTrend[cat]?.months[m]?.b;
+                    return v !== undefined ? +(v*100).toFixed(1) : null;
+                }),
+                barWidth: `${Math.max(8, 60/months.length)}%`,
+                label: { show: true, position: 'top', fontSize: 9 }
+            });
+        });
+        if (a2025) {
+            seriesBatch.push({
+                name: '2025月均批次',
+                type: 'line',
+                data: sortedCats.map(cat => {
+                    const v = catTrend[cat]?.avg2025B;
+                    return v !== null ? +(v*100).toFixed(1) : null;
+                }),
+                lineStyle: { color: '#e74c3c', type: 'dashed', width: 2 },
+                symbol: 'diamond',
+                label: { show: true, position: 'top', color: '#e74c3c', fontWeight: 'bold' }
+            });
+        }
+        batchChart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { type: 'scroll', data: seriesBatch.map(s=>s.name) },
+            xAxis: { data: sortedCats, axisLabel: { rotate: 30, fontSize: 10 } },
+            yAxis: { name: '批次合格率(%)', max: 100 },
+            series: seriesBatch,
+            grid: { containLabel: true }
+        });
+        let t1 = '<table><thead><tr><th>类别</th>';
+        months.forEach(m => t1 += `<th>${m.replace('2026-','')}月批次</th>`);
+        if (a2025) t1 += '<th>2025月均批次合格率</th>';
+        t1 += '</tr></thead><tbody>';
+        sortedCats.forEach(cat => {
+            t1 += '<tr><td>'+cat+'</td>';
+            months.forEach(m => {
+                const v = catTrend[cat]?.months[m]?.b;
+                t1 += `<td>${v!==undefined?(v*100).toFixed(1)+'%':'—'}</td>`;
+            });
+            if (a2025) t1 += `<td>${catTrend[cat]?.avg2025B!==null?(catTrend[cat].avg2025B*100).toFixed(1)+'%':'—'}</td>`;
+            t1 += '</tr>';
+        });
+        t1 += '</tbody></table>';
+        document.getElementById('categoryBatchTrendTable').innerHTML = t1;
+
+        const qtyDom = document.getElementById('categoryQtyTrendChart');
+        if (qtyDom) { const inst = echarts.getInstanceByDom(qtyDom); if (inst) inst.dispose(); }
+        const qtyChart = echarts.init(qtyDom);
+        const seriesQty = [];
+        months.forEach(m => {
+            seriesQty.push({
+                name: m.replace('2026-','')+'月数量',
+                type: 'bar',
+                data: sortedCats.map(cat => {
+                    const v = catTrend[cat]?.months[m]?.q;
+                    return v !== undefined ? +(v*100).toFixed(1) : null;
+                }),
+                barWidth: `${Math.max(8, 60/months.length)}%`,
+                label: { show: true, position: 'top', fontSize: 9 }
+            });
+        });
+        if (a2025) {
+            seriesQty.push({
+                name: '2025月均数量',
+                type: 'line',
+                data: sortedCats.map(cat => {
+                    const v = catTrend[cat]?.avg2025Q;
+                    return v !== null ? +(v*100).toFixed(1) : null;
+                }),
+                lineStyle: { color: '#f39c12', type: 'dashed', width: 2 },
+                symbol: 'diamond',
+                label: { show: true, position: 'top', color: '#f39c12', fontWeight: 'bold' }
+            });
+        }
+        qtyChart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { type: 'scroll', data: seriesQty.map(s=>s.name) },
+            xAxis: { data: sortedCats, axisLabel: { rotate: 30 } },
+            yAxis: { name: '数量合格率(%)', max: 100 },
+            series: seriesQty,
+            grid: { containLabel: true }
+        });
+        let t2 = '<table><thead><tr><th>类别</th>';
+        months.forEach(m => t2 += `<th>${m.replace('2026-','')}月数量</th>`);
+        if (a2025) t2 += '<th>2025月均数量合格率</th>';
+        t2 += '</tr></thead><tbody>';
+        sortedCats.forEach(cat => {
+            t2 += '<tr><td>'+cat+'</td>';
+            months.forEach(m => {
+                const v = catTrend[cat]?.months[m]?.q;
+                t2 += `<td>${v!==undefined?(v*100).toFixed(1)+'%':'—'}</td>`;
+            });
+            if (a2025) t2 += `<td>${catTrend[cat]?.avg2025Q!==null?(catTrend[cat].avg2025Q*100).toFixed(1)+'%':'—'}</td>`;
+            t2 += '</tr>';
+        });
+        t2 += '</tbody></table>';
+        document.getElementById('categoryQtyTrendTable').innerHTML = t2;
+    }
+
+    function renderCatLatest(latestStats) {
+        if (!latestStats) return;
+        const cats = catStats(latestStats.suppliers).filter(c => c.tb>0 && !IGNORE_CATEGORIES.has(c.cat)).sort((a,b)=>b.tb-a.tb);
+        let h='<table><thead><tr><th>类别</th><th>总批次</th><th>合格批次</th><th>批次合格率</th><th>总数量</th><th>合格数量</th><th>数量合格率</th></tr></thead><tbody>';
+        cats.forEach(c=>h+=`<tr><td>${c.cat}</td><td>${c.tb}</td><td>${c.qb}</td><td>${(c.batchQualRate*100).toFixed(1)}%</td><td>${c.tq.toLocaleString()}</td><td>${c.qq.toLocaleString()}</td><td>${(c.qtyQualRate*100).toFixed(1)}%</td></tr>`);
+        h+='</tbody></table>';
+        document.getElementById('categoryLatestTable').innerHTML = h;
+    }
+
+    function renderCatFull(a2025, monthly, months, overallCat, cats, trend) {
+        let head = '<tr><th>类别</th><th>2025月均批次合格率</th><th>2025月均数量合格率</th>';
+        months.forEach(m => head += `<th>${m.replace('2026-','')}月批次</th><th>${m.replace('2026-','')}月数量</th>`);
+        head += '<th>2026至今平均批次</th><th>2026至今平均数量</th></tr>';
+        let body = '';
+        cats.forEach(cat => {
+            if (IGNORE_CATEGORIES.has(cat)) return;
+            const t = trend[cat];
+            const oc = overallCat.find(c=>c.cat===cat);
+            body += '<tr><td>'+cat+'</td>';
+            body += `<td>${t.avg2025B!==null?(t.avg2025B*100).toFixed(1)+'%':'—'}</td><td>${t.avg2025Q!==null?(t.avg2025Q*100).toFixed(1)+'%':'—'}</td>`;
+            months.forEach(m => {
+                const md = t.months[m];
+                body += `<td>${md? (md.b*100).toFixed(1)+'%':'—'}</td><td>${md? (md.q*100).toFixed(1)+'%':'—'}</td>`;
+            });
+            body += `<td style="font-weight:bold;">${oc? (oc.batchQualRate*100).toFixed(1)+'%':'—'}</td><td style="font-weight:bold;">${oc? (oc.qtyQualRate*100).toFixed(1)+'%':'—'}</td>`;
+            body += '</tr>';
+        });
+        document.getElementById('categoryFullTable').innerHTML = '<table>'+head+body+'</table>';
+    }
+
+    function renderMachiningTrend(a2025, monthly2026, months2026) {
+        const targetCat = '机加工供应商';
+        const months2025 = a2025 ? a2025.monthStats.filter(m => {
+            const cs = m.catStats.find(c => c.cat === targetCat);
+            return cs && cs.tb > 0;
+        }).map(m => ({ month: m.month, batchQualRate: m.catStats.find(c=>c.cat===targetCat)?.batchQualRate || 0, qtyQualRate: m.catStats.find(c=>c.cat===targetCat)?.qtyQualRate || 0 })) : [];
+        const months2026Data = monthly2026.map(m => {
+            const cs = m.catStats.find(c => c.cat === targetCat);
+            return { month: m.month, batchQualRate: cs ? cs.batchQualRate : null, qtyQualRate: cs ? cs.qtyQualRate : null };
+        }).filter(x => x.batchQualRate !== null);
+        const monthNumbers = Array.from({length:12}, (_,i)=> i+1);
+        const labels = monthNumbers.map(n => n+'月');
+        const batch2025 = monthNumbers.map(n => { const ym=`2025-${String(n).padStart(2,'0')}`; const f=months2025.find(x=>x.month===ym); return f?+(f.batchQualRate*100).toFixed(1):null; });
+        const batch2026 = monthNumbers.map(n => { const ym=`2026-${String(n).padStart(2,'0')}`; const f=months2026Data.find(x=>x.month===ym); return f?+(f.batchQualRate*100).toFixed(1):null; });
+        const qty2025 = monthNumbers.map(n => { const ym=`2025-${String(n).padStart(2,'0')}`; const f=months2025.find(x=>x.month===ym); return f?+(f.qtyQualRate*100).toFixed(1):null; });
+        const qty2026 = monthNumbers.map(n => { const ym=`2026-${String(n).padStart(2,'0')}`; const f=months2026Data.find(x=>x.month===ym); return f?+(f.qtyQualRate*100).toFixed(1):null; });
+
+        const batchDom = document.getElementById('machiningBatchChart');
+        if (batchDom) { const inst = echarts.getInstanceByDom(batchDom); if (inst) inst.dispose(); }
+        const batchChart = echarts.init(batchDom);
+        batchChart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['2025批次合格率', '2026批次合格率'] },
+            xAxis: { data: labels },
+            yAxis: { name: '批次合格率(%)', max: 100 },
+            series: [
+                { name: '2025批次合格率', type: 'line', data: batch2025, color: '#f39c12', symbol: 'circle', lineStyle: { type: 'dashed' }, label: { show: true, position: 'top' } },
+                { name: '2026批次合格率', type: 'line', data: batch2026, color: '#3498db', symbol: 'diamond', label: { show: true, position: 'top' } }
+            ],
+            grid: { containLabel: true }
+        });
+
+        const qtyDom = document.getElementById('machiningQtyChart');
+        if (qtyDom) { const inst = echarts.getInstanceByDom(qtyDom); if (inst) inst.dispose(); }
+        const qtyChart = echarts.init(qtyDom);
+        qtyChart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['2025数量合格率', '2026数量合格率'] },
+            xAxis: { data: labels },
+            yAxis: { name: '数量合格率(%)', max: 100 },
+            series: [
+                { name: '2025数量合格率', type: 'line', data: qty2025, color: '#f39c12', symbol: 'circle', lineStyle: { type: 'dashed' }, label: { show: true, position: 'top' } },
+                { name: '2026数量合格率', type: 'line', data: qty2026, color: '#2ecc71', symbol: 'diamond', label: { show: true, position: 'top' } }
+            ],
+            grid: { containLabel: true }
+        });
+    }
+
+    document.getElementById('btnGenerate').onclick = ()=>{
+        try { const d = runAnalysis(); renderReport(d); } catch(e) { alert(e.message); }
+    };
+    document.getElementById('btnExportPdf').onclick = async ()=>{
+        if (!reportData) return alert('请先生成报告');
+        const pages = document.querySelectorAll('.pdf-page');
+        const { jsPDF } = window.jspdf;
+        let pdf;
+        for (let i=0; i<pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#fff' });
+            if (i===0) pdf = new jsPDF('l', 'mm', 'a4');
+            else pdf.addPage();
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, 277, canvas.height*277/canvas.width);
+        }
+        pdf.save('供应商月度趋势报告.pdf');
+    };
+    document.getElementById('btnExportExcel').onclick = ()=>{
+        if (!reportData) return alert('先生成报告');
+        const wb = XLSX.utils.book_new();
+        const { latestStats, overall2026Cat, sortedCats, catTrend, m2026, a2025 } = reportData;
+        const rows = sortedCats.filter(c => !IGNORE_CATEGORIES.has(c)).map(cat => {
+            const t = catTrend[cat];
+            const oc = overall2026Cat.find(c=>c.cat===cat);
+            const r = { '类别': cat };
+            if (a2025) { r['2025月均批次'] = t.avg2025B!==null ? (t.avg2025B*100).toFixed(1)+'%' : ''; r['2025月均数量'] = t.avg2025Q!==null ? (t.avg2025Q*100).toFixed(1)+'%' : ''; }
+            m2026.forEach(m => { const md = t.months[m]; r[m+'批次'] = md ? (md.b*100).toFixed(1)+'%' : ''; r[m+'数量'] = md ? (md.q*100).toFixed(1)+'%' : ''; });
+            r['2026至今平均批次'] = oc ? (oc.batchQualRate*100).toFixed(1)+'%' : '';
+            r['2026至今平均数量'] = oc ? (oc.qtyQualRate*100).toFixed(1)+'%' : '';
+            return r;
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '类别汇总');
+        if (latestStats) {
+            const supplierRows = latestStats.suppliers.filter(s => !IGNORE_CATEGORIES.has(s.cat)).map(s => ({
+                '供应商编码': s.code,
+                '批次': s.batch,
+                '合格批次': s.qualBatch,
+                '批次合格率': (s.batchQualRate*100).toFixed(1)+'%',
+                '总数量': s.totalQty,
+                '数量合格率': (s.qtyQualRate*100).toFixed(1)+'%'
+            }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(supplierRows), '供应商明细');
+        }
+        XLSX.writeFile(wb, '供应商月度趋势分析.xlsx');
+    };
+    document.getElementById('btnReset').onclick = ()=>{
+        raw2025 = []; raw2026ByMonth.clear(); reportData = null;
+        document.getElementById('file2025').value = ''; document.getElementById('files2026').value = '';
+        document.getElementById('status2025').innerHTML = ''; document.getElementById('status2026').innerHTML = '';
+        document.getElementById('reportContainer').style.display = 'none';
+    };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPK 过程能力分析 · 青岛智腾微电子</title>
+    <!-- 稳定版CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-dark: #0f2b5c;
+            --primary: #1a4b8c;
+            --primary-light: #2d6cc0;
+            --bg: #f4f7fc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-secondary: #475569;
+            --border: #d9e2ef;
+            --radius: 14px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+        }
+        .app-container { max-width: 1440px; width: 100%; }
+        .header {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            color: white;
+            padding: 24px 32px;
+            border-radius: var(--radius);
+            margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .header h1 { font-size: 1.9rem; font-weight: 700; }
+        .btn {
+            padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none;
+            background: white; color: var(--primary); display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: var(--primary-light); color: white; } .btn-primary:hover { background: #1e5bb0; }
+        .btn-danger { background: #dc2626; color: white; } .btn-danger:hover { background: #b91c1c; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; margin-bottom: 24px; }
+        .card {
+            background: var(--card-bg); border-radius: var(--radius); padding: 24px;
+            box-shadow: 0 6px 20px rgba(0,20,50,0.08); border: 1px solid var(--border);
+        }
+        .card-title {
+            font-weight: 700; color: var(--primary-dark); margin-bottom: 20px;
+            font-size: 1.05rem; border-bottom: 2px solid var(--border); padding-bottom: 10px;
+        }
+        .input-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 110px; }
+        .input-group label { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+        input, textarea {
+            padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+            font-size: 0.95rem; background: #f8fafd;
+        }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px,1fr)); gap: 12px; }
+        .stat-item { background: #f1f6fc; padding: 14px 10px; border-radius: 10px; text-align: center; }
+        .chart-box { width: 100%; height: 350px; margin: 16px 0 8px; }
+        .chart-interpretation {
+            font-size: 0.85rem; color: var(--text-secondary); background: #f8fafd;
+            border-left: 4px solid var(--primary-light); padding: 10px 14px; border-radius: 6px; margin-top: 8px;
+        }
+        .table-wrap { max-height: 320px; overflow-y: auto; border-radius: 10px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { background: #eef3fa; padding: 10px; color: var(--primary-dark); text-align: center; }
+        td { padding: 8px; text-align: center; border-top: 1px solid var(--border); }
+        .grade-highlight { background: #e0f0ff; font-weight: bold; }
+        .preview-box { display: flex; gap: 16px; margin-top: 12px; }
+        .preview-box img { max-width: 120px; max-height: 80px; border: 1px solid #ddd; border-radius: 4px; }
+        #report-html { position: absolute; left: -9999px; top: 0; width: 800px; background: white; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="header">
+        <div>
+            <h1>📊 CPK 过程能力分析系统</h1>
+            <div>青岛智腾微电子有限公司 · 质量工艺管理部</div>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="btn" id="uploadWordBtn">📄 导入Word封面 (.docx)</button>
+            <button class="btn" id="downloadTemplateBtn">⬇ 下载CSV模板</button>
+            <button class="btn btn-primary" id="startAnalysisBtn">▶ 开始分析</button>
+            <button class="btn btn-danger" id="clearDataBtn">🗑 清除所有数据</button>
+            <button class="btn btn-primary" id="exportPdfBtn">📑 导出PDF报告</button>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">📋 基本信息 & 规格参数</div>
+            <div class="input-row">
+                <div class="input-group"><label>供应商</label><input id="supplierInput" placeholder="供应商名称"></div>
+                <div class="input-group"><label>产品名称</label><input id="productInput" placeholder="产品"></div>
+                <div class="input-group"><label>料号</label><input id="partNoInput" placeholder="料号"></div>
+            </div>
+            <div class="input-row" style="margin-top:16px;">
+                <div class="input-group"><label>规格上限 USL</label><input type="number" id="uslInput" value="10.50" step="any"></div>
+                <div class="input-group"><label>规格下限 LSL</label><input type="number" id="lslInput" value="9.50" step="any"></div>
+                <div class="input-group"><label>目标值</label><input type="number" id="targetInput" placeholder="自动计算" step="any"></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">🧪 子组数据录入（每组数据量不限）</div>
+            <div class="input-row">
+                <div class="input-group" style="flex:2"><label>当前子组 (逗号分隔)</label><input id="subgroupInput" placeholder="9.82,9.91,10.05,..."></div>
+                <button class="btn btn-primary" id="addSubgroupBtn">➕ 添加子组</button>
+                <button class="btn" id="importDataBtn">📂 导入文件 (csv/xls/xlsx)</button>
+            </div>
+            <div style="margin-top:12px;">已添加 <strong id="subgroupCount">0</strong> 组，总数据点 <strong id="totalDataPoints">0</strong></div>
+            <button class="btn" id="loadDemoBtn" style="margin-top:12px;">📋 加载演示数据 (3组×10)</button>
+        </div>
+    </div>
+
+    <div class="card" id="imagePreviewCard" style="display:none;">
+        <div class="card-title">🖼️ 已导入的Word图片</div>
+        <div class="preview-box" id="imagePreviewContainer"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📊 统计结果</div>
+        <div class="stat-grid" id="statsContainer">请先添加数据并点击“开始分析”</div>
+    </div>
+
+    <div class="card" id="conclusionCard" style="display:none;">
+        <div class="card-title">🔍 分析结论与建议</div>
+        <div id="conclusionContent"></div>
+        <div style="margin-top:16px;">
+            <h4 style="color:var(--primary-dark);">CPK等级判定标准</h4>
+            <table style="width:100%; margin-top:8px;">
+                <thead><tr><th>CPK范围</th><th>等级</th><th>过程能力评价</th></tr></thead>
+                <tbody id="gradeTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">🎯 靶点散布图</div>
+            <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+            <div class="chart-interpretation" id="scatterInterpret"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">📈 正态分布曲线（拟合）</div>
+            <div class="chart-box"><canvas id="normalCurveChart"></canvas></div>
+            <div class="chart-interpretation" id="normalCurveInterpret"></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">📈 均值控制图 (X-bar)</div>
+            <div class="chart-box"><canvas id="xbarChart"></canvas></div>
+            <div class="chart-interpretation" id="xbarInterpret"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">📉 极差控制图 (R)</div>
+            <div class="chart-box"><canvas id="rChart"></canvas></div>
+            <div class="chart-interpretation" id="rInterpret"></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">📊 正态概率图</div>
+            <div class="chart-box"><canvas id="probabilityChart"></canvas></div>
+            <div class="chart-interpretation" id="probInterpret"></div>
+        </div>
+        <div class="card"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📋 子组数据明细</div>
+        <div class="table-wrap" id="dataTableContainer"></div>
+    </div>
+</div>
+
+<input type="file" id="wordFileInput" accept=".docx" style="display:none">
+<input type="file" id="dataFileInput" accept=".csv,.txt,.xls,.xlsx" style="display:none">
+<div id="report-html"></div>
+
+<script>
+(function() {
+    if (typeof Chart === 'undefined') {
+        document.body.innerHTML = '<h2 style="text-align:center; margin-top:100px;">Chart.js 加载失败，请检查网络连接后刷新重试。</h2>';
+        return;
+    }
+
+    let subgroups = [];
+    let wordImages = [];
+    let chartInstances = {};
+
+    function showToast(msg) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#0f2b5c;color:white;padding:12px 24px;border-radius:30px;z-index:9999;';
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2500);
+    }
+
+    function getAllValues() { return subgroups.flat(); }
+
+    function computeStats() {
+        const vals = getAllValues();
+        if (!vals.length) return null;
+        const usl = parseFloat(document.getElementById('uslInput').value) || 10.5;
+        const lsl = parseFloat(document.getElementById('lslInput').value) || 9.5;
+        const target = document.getElementById('targetInput').value ? parseFloat(document.getElementById('targetInput').value) : (usl+lsl)/2;
+        const n = vals.length;
+        const mean = vals.reduce((a,b)=>a+b,0)/n;
+        const variance = vals.reduce((s,v)=>s+(v-mean)**2,0)/(n-1);
+        const std = Math.sqrt(variance);
+        const cp = (usl-lsl)/(6*std);
+        const cpu = (usl-mean)/(3*std);
+        const cpl = (mean-lsl)/(3*std);
+        const cpk = Math.min(cpu, cpl);
+        const oos = vals.filter(v => v>usl || v<lsl).length;
+        const yieldRate = ((n-oos)/n*100).toFixed(1);
+        let grade = 'E';
+        if (cpk >= 1.67) grade = 'A';
+        else if (cpk >= 1.33) grade = 'B';
+        else if (cpk >= 1.0) grade = 'C';
+        else if (cpk >= 0.67) grade = 'D';
+        return {n, mean, std, cp, cpk, cpu, cpl, oos, yieldRate, grade, usl, lsl, target};
+    }
+
+    function destroyChart(key) {
+        if (chartInstances[key]) {
+            chartInstances[key].destroy();
+            delete chartInstances[key];
+        }
+    }
+
+    function renderStats() {
+        const stats = computeStats();
+        const container = document.getElementById('statsContainer');
+        if (!stats) { container.innerHTML = '<div class="stat-item">无数据</div>'; return; }
+        container.innerHTML = `
+            <div class="stat-item"><strong>样本数</strong><br>${stats.n}</div>
+            <div class="stat-item"><strong>均值</strong><br>${stats.mean.toFixed(4)}</div>
+            <div class="stat-item"><strong>标准差</strong><br>${stats.std.toFixed(4)}</div>
+            <div class="stat-item"><strong>CP</strong><br>${stats.cp.toFixed(3)}</div>
+            <div class="stat-item"><strong>CPK</strong><br>${stats.cpk.toFixed(3)}</div>
+            <div class="stat-item"><strong>Pp</strong><br>${stats.cp.toFixed(3)}</div>
+            <div class="stat-item"><strong>Ppk</strong><br>${stats.cpk.toFixed(3)}</div>
+            <div class="stat-item"><strong>合格率</strong><br>${stats.yieldRate}%</div>
+            <div class="stat-item"><strong>评级</strong><br>${stats.grade}级</div>
+            <div class="stat-item"><strong>超差点</strong><br>${stats.oos}</div>`;
+    }
+
+    function renderConclusion() {
+        const stats = computeStats();
+        const card = document.getElementById('conclusionCard');
+        if (!stats) { card.style.display = 'none'; return; }
+        card.style.display = 'block';
+        let conclusion = '';
+        if (stats.grade === 'A') conclusion = '✅ 过程能力充分，满足验收要求。';
+        else if (stats.grade === 'B') conclusion = '⚠️ 过程能力良好，建议持续监控。';
+        else if (stats.grade === 'C') conclusion = '🔶 过程能力一般，需分析原因并改善。';
+        else if (stats.grade === 'D') conclusion = '🔴 过程能力不足，不可验收，需立即纠正。';
+        else conclusion = '🚫 过程能力严重不足，建议停产整顿。';
+        if (stats.oos > 0) conclusion += ` 当前存在 ${stats.oos} 个超出规格的测量值。`;
+        document.getElementById('conclusionContent').innerHTML = `
+            <p style="font-size:1.1rem; font-weight:600;">综合评级：<span style="color:${stats.grade==='A'?'#16a34a':stats.grade==='B'?'#2d6cc0':'#dc2626'};">${stats.grade}级</span></p>
+            <p style="margin-top:8px; color:var(--text-secondary);">${conclusion}</p>`;
+        const gradeRows = [
+            { range: '≥ 1.67', grade: 'A', desc: '过程能力充分' },
+            { range: '1.33 - 1.67', grade: 'B', desc: '过程能力良好' },
+            { range: '1.00 - 1.33', grade: 'C', desc: '过程能力一般' },
+            { range: '0.67 - 1.00', grade: 'D', desc: '过程能力不足' },
+            { range: '< 0.67', grade: 'E', desc: '过程能力严重不足' }
+        ];
+        document.getElementById('gradeTableBody').innerHTML = gradeRows.map(row => {
+            const isCurrent = row.grade === stats.grade;
+            return `<tr class="${isCurrent ? 'grade-highlight' : ''}">
+                <td>CPK ${row.range}</td><td>${row.grade}</td><td>${row.desc}</td></tr>`;
+        }).join('');
+    }
+
+    function renderTable() {
+        const container = document.getElementById('dataTableContainer');
+        if (!subgroups.length) { container.innerHTML = '<table><tr><td>暂无数据</td></tr></table>'; return; }
+        let html = '<table><thead><tr><th>子组</th><th>数据</th><th>均值</th><th>极差</th></tr></thead><tbody>';
+        subgroups.forEach((g,i) => {
+            const mean = (g.reduce((a,b)=>a+b,0)/g.length).toFixed(4);
+            const range = (Math.max(...g)-Math.min(...g)).toFixed(4);
+            html += `<tr><td>${i+1}</td><td>${g.join(',')}</td><td>${mean}</td><td>${range}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function drawCharts() {
+        const vals = getAllValues();
+        ['scatter','normal','xbar','r','prob'].forEach(k => destroyChart(k));
+
+        if (!vals.length) {
+            ['scatterChart','normalCurveChart','xbarChart','rChart','probabilityChart'].forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
+            });
+            return;
+        }
+
+        const stats = computeStats();
+        const subStats = subgroups.map(g => ({
+            mean: g.reduce((a,b)=>a+b,0)/g.length,
+            range: Math.max(...g)-Math.min(...g)
+        }));
+        const xbarMeans = subStats.map(s => s.mean);
+        const rValues = subStats.map(s => s.range);
+        const meanOfMeans = xbarMeans.reduce((a,b)=>a+b,0)/xbarMeans.length;
+        const meanOfR = rValues.reduce((a,b)=>a+b,0)/rValues.length;
+        const subgroupSize = subgroups[0]?.length || 1;
+        const A2_table = [0,0,1.880,1.023,0.729,0.577,0.483,0.419,0.373,0.337,0.308];
+        const D3_table = [0,0,0,0,0,0,0,0.076,0.136,0.184,0.223];
+        const D4_table = [0,0,3.267,2.574,2.282,2.114,2.004,1.924,1.864,1.816,1.777];
+        const idx = Math.min(subgroupSize, 10);
+        const A2 = A2_table[idx] || 0.308;
+        const D3 = D3_table[idx] || 0;
+        const D4 = D4_table[idx] || 2.0;
+
+        // 散布图
+        const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+        chartInstances.scatter = new Chart(scatterCtx, {
+            type: 'scatter',
+            data: { datasets: [{ label: '测量值', data: vals.map((v,i)=>({x:i,y:v})),
+                backgroundColor: vals.map(v=>(v>stats.usl||v<stats.lsl)?'#dc2626':'#2563eb') }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+        document.getElementById('scatterInterpret').innerText = `散布图显示所有测量值分布，红色点为超出规格限的异常点。当前超差点数：${stats.oos}。`;
+
+        // 正态分布曲线
+        const normalCtx = document.getElementById('normalCurveChart').getContext('2d');
+        const mu = stats.mean, sigma = stats.std;
+        const dataMin = Math.min(...vals), dataMax = Math.max(...vals);
+        const range = dataMax - dataMin || 1;
+        const xMin = dataMin - range * 0.1, xMax = dataMax + range * 0.1;
+        const step = (xMax - xMin) / 300;
+        const curveX = [], curveY = [];
+        const binWidth = range / 15;
+        for (let x = xMin; x <= xMax; x += step) {
+            curveX.push(x);
+            const density = (1/(sigma * Math.sqrt(2*Math.PI))) * Math.exp(-0.5 * Math.pow((x-mu)/sigma, 2));
+            curveY.push(density * vals.length * binWidth);
+        }
+        const maxY = Math.max(...curveY) || 1;
+        const yMin = 0, yMax = maxY * 1.2;
+        chartInstances.normal = new Chart(normalCtx, {
+            type: 'scatter',
+            data: { datasets: [
+                { type: 'line', label: '正态曲线', data: curveY.map((y,i)=>({x:curveX[i],y})), borderColor:'#2563eb', borderWidth:2, fill:false, pointRadius:0, tension:0.3 },
+                { type: 'line', label: 'USL', data: [{x:stats.usl,y:yMin},{x:stats.usl,y:yMax}], borderColor:'#dc2626', borderWidth:2, borderDash:[6,3], pointRadius:0 },
+                { type: 'line', label: 'LSL', data: [{x:stats.lsl,y:yMin},{x:stats.lsl,y:yMax}], borderColor:'#dc2626', borderWidth:2, borderDash:[6,3], pointRadius:0 },
+                { type: 'line', label: '目标', data: [{x:stats.target,y:yMin},{x:stats.target,y:yMax}], borderColor:'#16a34a', borderWidth:2, borderDash:[4,4], pointRadius:0 }
+            ]},
+            options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{ x:{type:'linear', title:{display:true,text:'测量值'}, min:xMin, max:xMax }, y:{title:{display:true,text:'频数'}, min:yMin, max:yMax } } }
+        });
+        document.getElementById('normalCurveInterpret').innerText = '正态曲线图展示数据分布形态，垂直虚线为规格限和目标值。';
+
+        // X-bar 控制图
+        const xbarCtx = document.getElementById('xbarChart').getContext('2d');
+        chartInstances.xbar = new Chart(xbarCtx, {
+            type: 'line',
+            data: { labels: xbarMeans.map((_,i)=>`组${i+1}`), datasets: [
+                { label:'子组均值', data:xbarMeans, borderColor:'#2563eb' },
+                { label:'CL', data:Array(xbarMeans.length).fill(meanOfMeans), borderColor:'#16a34a', borderDash:[5,5] },
+                { label:'UCL', data:Array(xbarMeans.length).fill(meanOfMeans+A2*meanOfR), borderColor:'#dc2626', borderDash:[3,3] },
+                { label:'LCL', data:Array(xbarMeans.length).fill(meanOfMeans-A2*meanOfR), borderColor:'#dc2626', borderDash:[3,3] }
+            ]},
+            options: { responsive:true, maintainAspectRatio:false }
+        });
+        document.getElementById('xbarInterpret').innerText = '均值控制图显示子组均值的波动情况。若有点超出控制限，表明过程均值失控。';
+
+        // R 控制图
+        const rCtx = document.getElementById('rChart').getContext('2d');
+        chartInstances.r = new Chart(rCtx, {
+            type: 'line',
+            data: { labels: rValues.map((_,i)=>`组${i+1}`), datasets: [
+                { label:'子组极差', data:rValues, borderColor:'#9333ea' },
+                { label:'CL', data:Array(rValues.length).fill(meanOfR), borderColor:'#16a34a', borderDash:[5,5] },
+                { label:'UCL', data:Array(rValues.length).fill(D4*meanOfR), borderColor:'#dc2626', borderDash:[3,3] },
+                { label:'LCL', data:Array(rValues.length).fill(D3*meanOfR), borderColor:'#dc2626', borderDash:[3,3] }
+            ]},
+            options: { responsive:true, maintainAspectRatio:false }
+        });
+        document.getElementById('rInterpret').innerText = '极差控制图显示子组内变异的稳定性。若有点超出控制限，表明过程变异失控。';
+
+        // 正态概率图
+        const probCtx = document.getElementById('probabilityChart').getContext('2d');
+        const sorted = [...vals].sort((a,b)=>a-b);
+        const n = sorted.length;
+        const probData = sorted.map((v,i)=>({x:v, y:(i+1)/(n+1)}));
+        chartInstances.prob = new Chart(probCtx, {
+            type: 'scatter',
+            data: { datasets: [{ label:'概率', data:probData, backgroundColor:'#2563eb' }] },
+            options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ min:0, max:1 } } }
+        });
+        document.getElementById('probInterpret').innerText = '数据点近似一条直线则表明正态性良好，可正常计算CPK。';
+    }
+
+    function refresh() {
+        document.getElementById('subgroupCount').textContent = subgroups.length;
+        document.getElementById('totalDataPoints').textContent = getAllValues().length;
+        renderStats();
+        renderConclusion();
+        renderTable();
+        drawCharts();
+    }
+
+    // 事件绑定
+    document.getElementById('addSubgroupBtn').addEventListener('click', ()=>{
+        const raw = document.getElementById('subgroupInput').value;
+        const vals = raw.split(/[,，\s]+/).map(Number).filter(v=>!isNaN(v));
+        if (vals.length === 0) { showToast('请输入至少一个数值'); return; }
+        subgroups.push(vals);
+        document.getElementById('subgroupInput').value = '';
+        refresh();
+    });
+
+    document.getElementById('importDataBtn').addEventListener('click', ()=> document.getElementById('dataFileInput').click());
+    document.getElementById('dataFileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const fileName = file.name.toLowerCase();
+        const isExcel = fileName.endsWith('.xls') || fileName.endsWith('.xlsx');
+        const reader = new FileReader();
+        if (isExcel) {
+            reader.onload = function(ev) {
+                try {
+                    const data = new Uint8Array(ev.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheet];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: null});
+                    let imported = 0;
+                    let startRow = 0;
+                    if (rows.length > 0) {
+                        const firstRowVals = rows[0].filter(v => v !== null && v !== '');
+                        const allNonNumeric = firstRowVals.every(v => isNaN(Number(v)));
+                        if (allNonNumeric) startRow = 1;
+                    }
+                    for (let i = startRow; i < rows.length; i++) {
+                        const row = rows[i];
+                        const vals = row.filter(v => v !== null && v !== '').map(v => Number(v)).filter(v => !isNaN(v));
+                        if (vals.length > 0) { subgroups.push(vals); imported++; }
+                    }
+                    if (imported > 0) { refresh(); showToast(`成功从Excel导入 ${imported} 组数据`); }
+                    else { showToast('Excel中未找到有效数值'); }
+                } catch (err) { showToast('Excel解析失败'); }
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.onload = function(ev) {
+                const text = ev.target.result;
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                let imported = 0;
+                for (const line of lines) {
+                    const vals = line.split(/[,，\s]+/).map(Number).filter(v=>!isNaN(v));
+                    if (vals.length > 0) { subgroups.push(vals); imported++; }
+                }
+                if (imported > 0) { refresh(); showToast(`成功导入 ${imported} 组数据`); }
+                else { showToast('文件中未找到有效数值'); }
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+        e.target.value = '';
+    });
+
+    document.getElementById('loadDemoBtn').addEventListener('click', ()=>{
+        subgroups = [
+            [9.82,9.91,10.05,9.78,10.12,9.95,10.08,9.88,10.01,9.97],
+            [9.76,10.02,9.93,10.11,10.05,9.89,9.97,10.03,9.91,10.06],
+            [9.84,10.00,9.92,10.04,9.98,10.09,9.85,10.07,9.99,10.02]
+        ];
+        document.getElementById('uslInput').value=10.5;
+        document.getElementById('lslInput').value=9.5;
+        refresh();
+        showToast('演示数据已加载 (3组×10)');
+    });
+
+    document.getElementById('startAnalysisBtn').addEventListener('click', refresh);
+    document.getElementById('clearDataBtn').addEventListener('click', ()=>{
+        if (subgroups.length === 0) { showToast('数据已为空'); return; }
+        if (confirm('确定要清除所有子组数据吗？')) { subgroups = []; refresh(); showToast('所有数据已清除'); }
+    });
+
+    document.getElementById('downloadTemplateBtn').addEventListener('click', ()=>{
+        const csv = '子组1,9.82,9.91,10.05,9.78,10.12,9.95,10.08,9.88,10.01,9.97\n子组2,9.76,10.02,9.93,10.11,10.05,9.89,9.97,10.03,9.91,10.06\n子组3,9.84,10.00,9.92,10.04,9.98,10.09,9.85,10.07,9.99,10.02';
+        const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'CPK_数据模板.csv'; a.click();
+        showToast('模板已下载');
+    });
+
+    document.getElementById('uploadWordBtn').addEventListener('click', ()=> document.getElementById('wordFileInput').click());
+    document.getElementById('wordFileInput').addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.name.toLowerCase().endsWith('.doc')) { showToast('不支持旧版.doc'); e.target.value=''; return; }
+        try {
+            const buffer = await file.arrayBuffer();
+            const result = await mammoth.convertToHtml({arrayBuffer: buffer});
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(result.value, 'text/html');
+            wordImages = Array.from(doc.querySelectorAll('img')).map(img => img.src);
+            const previewCard = document.getElementById('imagePreviewCard');
+            const previewContainer = document.getElementById('imagePreviewContainer');
+            if (wordImages.length > 0) {
+                previewCard.style.display = 'block';
+                previewContainer.innerHTML = wordImages.map(src => `<img src="${src}" alt="预览"/>`).join('');
+            } else { previewCard.style.display = 'none'; }
+            showToast(`成功提取 ${wordImages.length} 张图片`);
+        } catch (err) { showToast('Word解析失败'); }
+        e.target.value = '';
+    });
+
+    // PDF导出（包含全部图表，美化排版）
+    async function exportPDF() {
+        if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+            showToast('PDF库未加载，请检查网络后刷新重试');
+            return;
+        }
+        const stats = computeStats();
+        if (!stats) { showToast('请先添加数据并分析'); return; }
+
+        const supplier = document.getElementById('supplierInput').value || '未填写';
+        const product = document.getElementById('productInput').value || '未填写';
+        const partNo = document.getElementById('partNoInput').value || '未填写';
+        const now = new Date().toLocaleString();
+
+        let conclusion = '';
+        if (stats.grade === 'A') conclusion = '过程能力充分，满足验收要求。';
+        else if (stats.grade === 'B') conclusion = '过程能力良好，建议持续监控。';
+        else if (stats.grade === 'C') conclusion = '过程能力一般，需分析原因并改善。';
+        else if (stats.grade === 'D') conclusion = '过程能力不足，不可验收，需立即纠正。';
+        else conclusion = '过程能力严重不足，建议停产整顿。';
+        if (stats.oos > 0) conclusion += ` 当前存在 ${stats.oos} 个超出规格的测量值。`;
+
+        const gradeRows = [
+            { range: '≥ 1.67', grade: 'A', desc: '过程能力充分' },
+            { range: '1.33 - 1.67', grade: 'B', desc: '过程能力良好' },
+            { range: '1.00 - 1.33', grade: 'C', desc: '过程能力一般' },
+            { range: '0.67 - 1.00', grade: 'D', desc: '过程能力不足' },
+            { range: '< 0.67', grade: 'E', desc: '过程能力严重不足' }
+        ];
+        const gradeTableHtml = gradeRows.map(row => {
+            const isCurrent = row.grade === stats.grade;
+            return `<tr style="${isCurrent ? 'background:#e0f0ff; font-weight:bold;' : ''}"><td style="padding:6px;">CPK ${row.range}</td><td style="padding:6px;">${row.grade}</td><td style="padding:6px;">${row.desc}</td></tr>`;
+        }).join('');
+
+        const capTableHtml = `
+            <table style="width:100%; border-collapse:collapse; font-size:13px; border:1px solid #d9e2ef;">
+                <tr style="background:#f0f4ff;"><td style="padding:8px;"><strong>样本数</strong></td><td style="padding:8px;">${stats.n}</td><td style="padding:8px;"><strong>均值 μ</strong></td><td style="padding:8px;">${stats.mean.toFixed(4)}</td></tr>
+                <tr><td style="padding:8px;"><strong>标准差（整体）</strong></td><td style="padding:8px;">${stats.std.toFixed(4)}</td><td style="padding:8px;"><strong>目标值</strong></td><td style="padding:8px;">${stats.target.toFixed(3)}</td></tr>
+                <tr style="background:#f0f4ff;"><td style="padding:8px;"><strong>USL</strong></td><td style="padding:8px;">${stats.usl}</td><td style="padding:8px;"><strong>LSL</strong></td><td style="padding:8px;">${stats.lsl}</td></tr>
+                <tr><td style="padding:8px;"><strong>Cp</strong></td><td style="padding:8px;">${stats.cp.toFixed(3)}</td><td style="padding:8px;"><strong>Cpk</strong></td><td style="padding:8px;">${stats.cpk.toFixed(3)}</td></tr>
+                <tr style="background:#f0f4ff;"><td style="padding:8px;"><strong>Pp</strong></td><td style="padding:8px;">${stats.cp.toFixed(3)}</td><td style="padding:8px;"><strong>Ppk</strong></td><td style="padding:8px;">${stats.cpk.toFixed(3)}</td></tr>
+                <tr><td style="padding:8px;"><strong>CPU</strong></td><td style="padding:8px;">${stats.cpu.toFixed(3)}</td><td style="padding:8px;"><strong>CPL</strong></td><td style="padding:8px;">${stats.cpl.toFixed(3)}</td></tr>
+                <tr style="background:#f0f4ff;"><td style="padding:8px;"><strong>合格率</strong></td><td style="padding:8px;">${stats.yieldRate}%</td><td style="padding:8px;"><strong>评级</strong></td><td style="padding:8px; font-weight:bold; color:${stats.grade==='A'?'#16a34a':'#dc2626'};">${stats.grade}级</td></tr>
+            </table>`;
+
+        const baseStyle = 'font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:white; padding:25px 35px; width:800px;';
+        const coverStyle = 'font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:white; padding:40px; width:800px;';
+        const watermark = '<div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:70px; color:rgba(0,0,0,0.05); font-weight:bold; white-space:nowrap; z-index:0;">青岛智腾微电子有限公司</div>';
+        const secret = '<div style="position:absolute; top:20px; right:30px; font-size:26px; color:rgba(220,38,38,0.2); font-weight:bold; z-index:10;">保密</div>';
+
+        let coverImagesHtml = '';
+        if (wordImages.length > 0) {
+            coverImagesHtml = '<div style="margin-top:30px; display:flex; justify-content:center; gap:20px;">';
+            if (wordImages[0]) coverImagesHtml += `<div><img src="${wordImages[0]}" style="max-width:300px;"/><p style="margin-top:5px;">产品图</p></div>`;
+            if (wordImages[1]) coverImagesHtml += `<div><img src="${wordImages[1]}" style="max-width:300px;"/><p style="margin-top:5px;">设备图</p></div>`;
+            coverImagesHtml += '</div>';
+        }
+
+        const sections = [];
+        // 封面
+        sections.push({ html: `<div style="${coverStyle} position:relative; min-height:700px;">${watermark} ${secret}<div style="position:relative; z-index:1; text-align:center; margin-top:100px;"><h2 style="color:#0f2b5c; margin-bottom:5px;">青岛智腾微电子有限公司</h2><h3 style="color:#1a4b8c; margin-top:0;">CPK 过程能力分析报告</h3><p style="color:#475569;">质量工艺管理部 · ${now}</p>${coverImagesHtml}</div></div>`, isCover: true });
+
+        // 过程能力分析表
+        sections.push({ html: `<div style="${baseStyle} position:relative; font-size:14px;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">过程能力分析</h4><p style="margin-bottom:10px;"><strong>供应商：</strong>${supplier}　<strong>产品：</strong>${product}　<strong>料号：</strong>${partNo}</p>${capTableHtml}</div></div>`, isCover: false });
+
+        // 散布图
+        sections.push({ html: `<div style="${baseStyle} position:relative; text-align:center;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">靶点散布图</h4><img src="${document.getElementById('scatterChart').toDataURL()}" style="max-width:550px; width:100%;"/></div></div>`, isCover: false });
+
+        // 正态曲线
+        sections.push({ html: `<div style="${baseStyle} position:relative; text-align:center;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">正态分布曲线</h4><img src="${document.getElementById('normalCurveChart').toDataURL()}" style="max-width:550px; width:100%;"/></div></div>`, isCover: false });
+
+        // 控制图
+        sections.push({ html: `<div style="${baseStyle} position:relative; text-align:center;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">控制图（X-bar / R）</h4><img src="${document.getElementById('xbarChart').toDataURL()}" style="max-width:550px;"/><img src="${document.getElementById('rChart').toDataURL()}" style="max-width:550px; margin-top:10px;"/></div></div>`, isCover: false });
+
+        // 正态概率图
+        sections.push({ html: `<div style="${baseStyle} position:relative; text-align:center;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">正态概率图</h4><img src="${document.getElementById('probabilityChart').toDataURL()}" style="max-width:550px;"/></div></div>`, isCover: false });
+
+        // 结论与标准
+        sections.push({ html: `<div style="${baseStyle} position:relative; font-size:14px;">${watermark} ${secret}<div style="position:relative; z-index:1;"><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:15px;">结论与建议</h4><div style="background:#f0f5ff; padding:16px; border-radius:8px; margin:15px 0;"><p style="font-size:15px; font-weight:600;">综合评级：<span style="color:${stats.grade==='A'?'#16a34a':'#dc2626'};">${stats.grade}级</span></p><p>${conclusion}</p></div><h4 style="font-size:16px; color:#0f2b5c; border-bottom:2px solid #d9e2ef; padding-bottom:5px; margin-bottom:10px;">CPK等级判定标准</h4><table style="width:100%; border-collapse:collapse;">${gradeTableHtml}</table><div style="margin-top:30px; text-align:right; color:#64748b;">质量工艺管理部</div></div></div>`, isCover: false });
+
+        const { jsPDF } = jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const container = document.getElementById('report-html');
+        let currentY = 0;
+
+        for (const sec of sections) {
+            container.innerHTML = sec.html;
+            const el = container.firstElementChild;
+            const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', logging: false });
+            const imgWidth = sec.isCover ? 210 : 194;
+            const x = sec.isCover ? 0 : 8;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            if (currentY + imgHeight > 297 && currentY > 0) {
+                pdf.addPage();
+                currentY = 0;
+            }
+            pdf.addImage(canvas, 'PNG', x, currentY, imgWidth, imgHeight);
+            currentY += imgHeight;
+        }
+        container.innerHTML = '';
+        pdf.save(`CPK_报告_${new Date().toISOString().slice(0,10)}.pdf`);
+        showToast('PDF报告已生成，包含全部图表并美化格式');
+    }
+
+    document.getElementById('exportPdfBtn').addEventListener('click', exportPDF);
+    document.getElementById('statsContainer').innerHTML = '<div class="stat-item">请添加数据并点击“开始分析”</div>';
+})();
+</script>
+</body>
+</html>

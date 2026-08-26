@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python -c ' *)",
+      "Read(//usr/**)",
+      "Bash(ls /c/Python*)",
+      "Bash(where python *)",
+      "Bash(py -c ' *)",
+      "Bash(py -m pip install openpyxl -q)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/2019/Professional/MSBuild/Current/Bin/MSBuild.exe\" PEManager.sln /t:Build /p:Configuration=Debug)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Professional/MSBuild/Current/Bin/MSBuild.exe\" PEManager.sln /t:Build /p:Configuration=Debug)",
+      "Bash(MSBuild PEManager.sln /t:Build /p:Configuration=Debug)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)",
+      "Read(//f//**)",
+      "Bash(where dotnet *)",
+      "Bash(dotnet --version)",
+      "Bash(vswhere -latest -requires Microsoft.Component.MSBuild -find MSBuild\\\\**\\\\Bin\\\\MSBuild.exe)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(dotnet msbuild *)",
+      "Read(//d/WorkProjects/2_MES/01_ZTCloud/**)",
+      "Read(//c/ZTCloud/**)",
+      "Read(//d/WorkProjects/2_MES/**)",
+      "Bash(grep -iv \".dll$\\\\|.pdb$\\\\|.xml$\\\\|.cs$\")",
+      "Bash(dotnet script *)",
+      "Bash(powershell -Command ' *)"
+    ],
+    "additionalDirectories": [
+      "d:\\WorkProjects\\2_MES\\01_ZTCloud\\24_PEManager"
+    ]
+  }
+}
