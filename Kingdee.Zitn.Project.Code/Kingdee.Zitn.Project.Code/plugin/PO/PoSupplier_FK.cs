@@ -1,15 +1,11 @@
-﻿using Kingdee.BOS.App.Data;
+using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.Bill.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
+using Kingdee.Zitn.Project.Code.conf;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PO
 {
@@ -17,7 +13,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
     [HotUpdate]
     public class PoSupplier_FK : AbstractBillPlugIn
     {
-        private static readonly string LogPath = @"D:\金蝶自定义日志文件\采购订单审核推送BPM合同.txt";
+        private static readonly CustomLog.LogWriter _log = CustomLog.For("采购订单付款条件");
 
         public override void AfterBarItemClick(AfterBarItemClickEventArgs e)
         {
@@ -32,50 +28,41 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 if (supplierObj != null)
                 {
                     var supplierId = supplierObj["Id"];
-                    WriteLog($"GYSID: {supplierId}");
+                    _log.WriteLog($"GYSID: {supplierId}");
 
                     if (supplierId != null)
                     {
+                        var current = this.View.Model.GetValue("F_ZMER_Combo_qtr");
+                        bool hasValue = current != null && !string.IsNullOrEmpty(current.ToString());
 
-                        var gysOther = string.Format($"/*dialect*/SELECT F_UNW_COMBO_ZC5 FROM T_BD_SUPPLIER WHERE FSUPPLIERID = {supplierId}");
-                        var DT = DBUtils.ExecuteDynamicObject(this.Context, gysOther);
-                        if (DT != null && DT.Count > 0)
+                        if (hasValue)
                         {
-                            for (int ii = 0; ii < DT.Count; ii++)
+                            _log.WriteLog($"付款条件已有值: {current}，不覆盖");
+                        }
+                        else
+                        {
+                            var gysOther = string.Format($"/*dialect*/SELECT F_UNW_COMBO_ZC5 FROM T_BD_SUPPLIER WHERE FSUPPLIERID = {supplierId}");
+                            var DT = DBUtils.ExecuteDynamicObject(this.Context, gysOther);
+                            if (DT != null && DT.Count > 0)
                             {
-                                var fkfs = DT[ii]["F_UNW_COMBO_ZC5"].ToString();
-                                WriteLog($"FKFS: {fkfs}");
-
-                                if (fkfs != null && !fkfs.Equals(""))
+                                for (int ii = 0; ii < DT.Count; ii++)
                                 {
-                                    this.View.Model.SetValue("F_ZMER_Combo_qtr", fkfs);
+                                    var fkfs = DT[ii]["F_UNW_COMBO_ZC5"]?.ToString();
+                                    _log.WriteLog($"FKFS: {fkfs}");
+
+                                    if (!string.IsNullOrWhiteSpace(fkfs))
+                                    {
+                                        this.View.Model.SetValue("F_ZMER_Combo_qtr", fkfs);
+                                    }
                                 }
                             }
                         }
-
                     }
                 }
                 this.View.UpdateView("F_ZMER_Combo_qtr");
                 this.View.Model.Save();
-                WriteLog($"保存成功,fkfs: {this.View.Model.GetValue("F_ZMER_Combo_qtr")}");
+                _log.WriteLog($"保存成功, fkfs: {this.View.Model.GetValue("F_ZMER_Combo_qtr")}");
                 this.View.ShowMessage("供应商付款条件已带入成功！");
-            }
-        }
-
-        private static void WriteLog(string message)
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(LogPath);
-                if (!Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                File.AppendAllText(LogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}{Environment.NewLine}");
-            }
-            catch
-            {
-                // 日志写入失败不抛异常，避免影响主流程
             }
         }
     }
