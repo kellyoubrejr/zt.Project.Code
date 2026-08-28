@@ -94,8 +94,21 @@
     <Reference Include="Kingdee.K3.MFG.App">
       <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.MFG.App.dll</HintPath>
     </Reference>
+    <Reference Include="Kingdee.K3.MFG.PLN.App.Core">
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.MFG.PLN.App.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Kingdee.K3.MFG.ServiceHelper">
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.MFG.ServiceHelper.dll</HintPath>
+    </Reference>
+    <Reference Include="Kingdee.K3.SCM.App, Version=9.0.434.12, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.SCM.App.dll</HintPath>
+    </Reference>
     <Reference Include="Kingdee.K3.SCM.App.Purchase.Report">
       <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.SCM.App.Purchase.Report.dll</HintPath>
+    </Reference>
+    <Reference Include="Kingdee.K3.SCM.Contracts">
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.SCM.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="Kingdee.K3.SCM.Web.Client">
       <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.K3.SCM.Web.Client.dll</HintPath>
@@ -107,6 +120,7 @@
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -123,49 +137,81 @@
     <Compile Include="conf\CustomLog.cs" />
     <Compile Include="conf\ErpLogin.cs" />
     <Compile Include="conf\SFConfig.cs" />
+    <Compile Include="conf\WeComConfig.cs" />
     <Compile Include="Interface\ToBPM\BpmService.cs" />
     <Compile Include="Interface\ToMES\MesService.cs" />
     <Compile Include="Interface\ToOther\OtherService.cs" />
     <Compile Include="Interface\ToPLM\PlmService.cs" />
+    <Compile Include="plugin\Assem\AssemSubmitJudgeOpe.cs" />
     <Compile Include="plugin\BillOrListPlugin\BillButtonEvent.cs" />
     <Compile Include="plugin\BillOrListPlugin\BillControl.cs" />
+    <Compile Include="plugin\BillOrListPlugin\BillLastRowSetColorEntity.cs" />
     <Compile Include="plugin\BillOrListPlugin\CloseBill.cs" />
     <Compile Include="plugin\BillOrListPlugin\EntityAddOrCopyOrDelButton.cs" />
+    <Compile Include="plugin\BillOrListPlugin\ListOpenFromTest.cs" />
+    <Compile Include="plugin\BillOrListPlugin\ListUnAuditListColor.cs" />
     <Compile Include="plugin\BLPCZD\BLPCZDSubmitCheckMtrlNum.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushOutStock.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushTransferDirect.cs" />
     <Compile Include="plugin\FeedMtrl\FeedMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\FeedMtrl\TransferApplyAuditFeedMtrl.cs" />
+    <Compile Include="plugin\MoRpt\MoRptAuditOpeCheck.cs" />
     <Compile Include="plugin\MoRpt\MoRptSaveUpdateMaterialXLHInfo.cs" />
+    <Compile Include="plugin\Mo\MoAutoFeelMtrlFormPpbom.cs" />
+    <Compile Include="plugin\Mo\MoSelection.cs" />
+    <Compile Include="plugin\MRP\MRP_PlanHEBINGList.cs" />
+    <Compile Include="plugin\MRP\MRP_PlanHEBINGList1.cs" />
+    <Compile Include="plugin\MRP\MRP_PlnForceCastSaveToPlanOrderForm.cs" />
+    <Compile Include="plugin\MRP\MRP_PlnForceCastSaveToPlanOrderOpe.cs" />
+    <Compile Include="plugin\MRP\MRP_SalOrderSaveToPlanOrderForm.cs" />
+    <Compile Include="plugin\MRP\MRP_SalOrderSaveToPlanOrderOpe.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSMVaildate.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockEntryButtonSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\PickMtrl\PickMtrlAuditTransferDirect.cs" />
     <Compile Include="plugin\PickMtrl\PickMtrlJiaZhiFenLeiUpsert.cs" />
+    <Compile Include="plugin\PoReq\PoReqAfterBindData.cs" />
+    <Compile Include="plugin\PoReq\PoReqClickEntityButtonOpenForm.cs" />
+    <Compile Include="plugin\PoReq\PoReqClickMenuButtonOpenForm.cs" />
     <Compile Include="plugin\PO\btnPoToBPMHT.cs" />
+    <Compile Include="plugin\PO\PoAfterBindData.cs" />
+    <Compile Include="plugin\PO\PoAuditSetEntryBackColor.cs" />
     <Compile Include="plugin\PO\PoAuditToBPMHT.cs" />
+    <Compile Include="plugin\PO\PoBillBtnTIDAILIAO.cs" />
+    <Compile Include="plugin\PO\PoBillBtnXIANGSIMtrl.cs" />
     <Compile Include="plugin\PO\PoCGZQOperation.cs" />
+    <Compile Include="plugin\PO\PoListBtnOpenEXE.cs" />
+    <Compile Include="plugin\PO\PoOpenShowFrom.cs" />
     <Compile Include="plugin\PO\PoPriceOperation.cs" />
     <Compile Include="plugin\PO\PoRejWriteSupplierInfos.cs" />
+    <Compile Include="plugin\PO\PoSubmitJudgeFcolorflag.cs" />
+    <Compile Include="plugin\PO\PoSupplierFKFSDataChanged.cs" />
+    <Compile Include="plugin\PO\PoSupplierJudgeCount.cs" />
     <Compile Include="plugin\PO\PoSupplier_FK.cs" />
     <Compile Include="plugin\PRDinstock\PrdInstockAuditToBPM.cs" />
     <Compile Include="plugin\PrdInstock\PrdInstockAuditToBPMKF.cs" />
     <Compile Include="plugin\PRDinstock\PrdInstockAuditToBPMSZ.cs" />
     <Compile Include="plugin\PRDinstock\PrdInstockBtnToBPM.cs" />
+    <Compile Include="plugin\PRDinstock\PrdInstockBtnToBPMSZ.cs" />
     <Compile Include="plugin\PRDinstock\PrdInstockSubmitUpsertSYB.cs" />
     <Compile Include="plugin\QC\QCAuditUpsertDateTime.cs" />
     <Compile Include="plugin\QC\QC_SaveOrSubmit_UpdateAutoFlag.cs" />
+    <Compile Include="plugin\Report\Report_Req.cs" />
     <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\SFBill\SFBillAuditOpe.cs" />
     <Compile Include="plugin\SFBill\SFBillQueryEntryBtn.cs" />
     <Compile Include="plugin\SFBill\SFBillSaveGenOrderId.cs" />
     <Compile Include="plugin\SFBill\SFExpressClient.cs" />
     <Compile Include="plugin\SFCallBack\SFCallBack.cs" />
+    <Compile Include="plugin\SLTZD\ReceiveBillSaveOpe.cs" />
     <Compile Include="plugin\SLTZD\RecevieBillEntryBtnGetLot.cs" />
+    <Compile Include="plugin\SLTZD\SLTZDautoGetFLot.cs" />
     <Compile Include="plugin\StkInstock\StkInstockBtnToAssemble.cs" />
     <Compile Include="plugin\StkInstock\StkInstockPushAssemble.cs" />
+    <Compile Include="plugin\TransferApply\TransferApplyAuditPickMtrl.cs" />
     <Compile Include="plugin\TransferApply\TransferApplyAuditTransferDirect.cs" />
+    <Compile Include="plugin\TransferApply\TransferApplyDataChangedMtrlQty.cs" />
     <Compile Include="plugin\TransferApply\TransferApplyEntryBtnUpsertStockField.cs" />
     <Compile Include="plugin\TransferApply\TransferApplySumbitUpsertTransferDirectStockAndLocid.cs" />
     <Compile Include="plugin\TransferDirect\TransferDirectAuditSuanBox.cs" />
@@ -177,6 +223,8 @@
     <Compile Include="Schedule\SFBillPicturePull.cs" />
     <Compile Include="Schedule\SFBillSync.cs" />
     <Compile Include="models\ErpDataDict.cs" />
+    <Compile Include="Schedule\TransferApplyAndTransferDirectBatch.cs" />
+    <Compile Include="Util\SendMsg.cs" />
     <Compile Include="Util\Tools.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -28,7 +28,13 @@
       "Bash(\"C:/Windows/Microsoft.NET/Framework64/v4.0.30319/MSBuild.exe\" Kingdee.Zitn.Project.Code.csproj -p:Configuration=Debug -p:OutputPath=\"C:/temp/k3build/\" -t:Build -v:minimal -nologo)",
       "Bash(dotnet msbuild *)",
       "Bash(powershell.exe -NoProfile -Command ' *)",
-      "Read(//e/VS-github/ERP/zitn_prd_instock_button_tobpm_pluginDev/zitn_prd_instock_button_tobpm_pluginDev/**)"
+      "Read(//e/VS-github/ERP/zitn_prd_instock_button_tobpm_pluginDev/zitn_prd_instock_button_tobpm_pluginDev/**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)",
+      "Read(//c/Windows/Microsoft.NET/Framework64/**)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/Installer/vswhere.exe\" -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)",
+      "Bash(\"/f/vs2022/MSBuild/Current/Bin/MSBuild.exe\" \"Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code.csproj\" -p:Configuration=Debug -v:minimal -nologo)",
+      "Bash(grep -nE \"MRP|plugin\\\\\\\\\\\\\\\\Mo|MoAutoFeelMtrl\" \"e:/CodeFiles/Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code.csproj\")",
+      "Bash(\"F:/vs2022/MSBuild/Current/Bin/MSBuild.exe\" \"e:/CodeFiles/Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code/Kingdee.Zitn.Project.Code.csproj\" -p:Configuration=Debug -v:minimal -nologo)"
     ]
   }
 }
