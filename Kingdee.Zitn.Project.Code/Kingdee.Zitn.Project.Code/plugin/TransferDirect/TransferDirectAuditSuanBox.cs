@@ -37,7 +37,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                 {
                     log.WriteLog($"开始处理: {billNo}, FID={fid}");
 
-                    var groupBoxOffset = new Dictionary<string, int>();
+                    var boxOffsets = new Dictionary<string, int>();
 
                     var entrySql = $@"/*dialect*/SELECT E.FENTRYID,  E.FMATERIALID, M.FNUMBER AS FMATERIALNO, E.FQTY
 FROM T_STK_STKTRANSFERIN H
@@ -78,7 +78,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                             continue;
                         }
                         
-                        var groupBoxOptions = new Dictionary<string, (decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
+                        var candidates = new List<(decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
                         for (int j = 0; j < specs.Count; j++)
                         {
                             var ffhbzlb = Convert.ToString(specs[j]["FFHBZLB"] ?? "");
@@ -88,29 +88,28 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                             if (ffhbzsl <= 0) continue;
 
-                            var groupKey = $"{ffhbzlb}|{fscbzgg}";
-                            if (!groupBoxOptions.ContainsKey(groupKey))
-                            {
-                                var boxes = (int)Math.Ceiling(qty / ffhbzsl);
-                                groupBoxOptions[groupKey] = (ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg);
-                            }
+                            var boxes = (int)Math.Ceiling(qty / ffhbzsl);
+                            candidates.Add((ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg));
                         }
 
-                        if (groupBoxOptions.Count == 0)
+                        if (candidates.Count == 0)
                         {
                             log.WriteLog($"  EntryID={entryId} 物料{materialNo} 无有效的包装规格，跳过");
                             continue;
                         }
 
-                        var best = groupBoxOptions.Values
-                            .OrderBy(o => o.BoxCount)
+                        var best = candidates
+                            .OrderBy(o => o.FFHBZLB == "2" ? 0 : 1)
+                            .ThenBy(o => o.BoxCount)
                             .ThenBy(o => qty % o.PerBox == 0 ? 0 : 1)
                             .ThenByDescending(o => o.PerBox)
-                            .ThenBy(o => o.FFHBZLB == "2" ? 0 : 1)
                             .First();
 
                         int minBoxes = best.BoxCount;
                         decimal bestPerBox = best.PerBox;
+
+                        var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
+                        int boxOffset = boxOffsets.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
 
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 数量={qty}, 最优方案: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
 
@@ -122,9 +121,6 @@ SET FFHBZLB = '{best.FFHBZLB}',
 WHERE FENTRYID = {entryId}";
                         DBUtils.Execute(this.Context, updateEntrySql);
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已回写单据体");
-
-                        var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
-                        int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
 
                         var serialSql = $@"/*dialect*/SELECT T1.FSERIALID, T1.FDSJJFSW, A.FNUMBER AS FSERIALNO
 FROM T_STK_STKTRANSFERINSERIAL T1
@@ -156,7 +152,7 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
                         }
 
                         int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
-                        groupBoxOffset[boxGroupKey] = boxOffset + actualBoxes;
+                        boxOffsets[boxGroupKey] = boxOffset + actualBoxes;
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                     }
 
@@ -181,7 +177,7 @@ WHERE FENTRYID = {entryId} AND FSERIALID = {serialId}";
 
         private static bool IsNo(string s)
         {
-            return s == "否";
+            return s == "2";
         }
     }
 }

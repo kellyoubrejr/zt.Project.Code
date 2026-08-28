@@ -35,7 +35,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                 if (entries == null || entries.Count == 0)
                     return;
 
-                var groupBoxOffset = new Dictionary<string, int>();
+                var boxOffsets = new Dictionary<string, int>();
 
                 for (int i = 0; i < entries.Count; i++)
                 {
@@ -56,7 +56,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                     var specs = DBUtils.ExecuteDynamicObject(this.Context, specSql);
                     if (specs == null || specs.Count == 0) continue;
 
-                    var groupBoxOptions = new Dictionary<string, (decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
+                    var candidates = new List<(decimal PerBox, int BoxCount, string FFHBZLB, string FSCBZGG, string FFHBZGG)>();
                     for (int j = 0; j < specs.Count; j++)
                     {
                         var ffhbzlb = Convert.ToString(specs[j]["FFHBZLB"] ?? "");
@@ -66,30 +66,26 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
 
                         if (ffhbzsl <= 0) continue;
 
-                        var groupKey = $"{ffhbzlb}|{fscbzgg}";
-                        if (!groupBoxOptions.ContainsKey(groupKey))
-                        {
-                            var boxes = (int)Math.Ceiling(qty / ffhbzsl);
-                            groupBoxOptions[groupKey] = (ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg);
-                        }
+                        var boxes = (int)Math.Ceiling(qty / ffhbzsl);
+                        candidates.Add((ffhbzsl, boxes, ffhbzlb, fscbzgg, ffhbzgg));
                     }
 
-                    if (groupBoxOptions.Count == 0) continue;
+                    if (candidates.Count == 0) continue;
 
-                    var best = groupBoxOptions.Values
-                        .OrderBy(o => o.BoxCount)
+                    var best = candidates
+                        .OrderBy(o => o.FFHBZLB == "2" ? 0 : 1)
+                        .ThenBy(o => o.BoxCount)
                         .ThenBy(o => qty % o.PerBox == 0 ? 0 : 1)
                         .ThenByDescending(o => o.PerBox)
-                        .ThenBy(o => o.FFHBZLB == "2" ? 0 : 1)
                         .First();
 
                     int minBoxes = best.BoxCount;
                     decimal bestPerBox = best.PerBox;
 
-                    log.WriteLog($"  第{i + 1}行 物料{materialNo} 数量={qty}, 最优: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
-
                     var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
-                    int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+                    int boxOffset = boxOffsets.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+
+                    log.WriteLog($"  第{i + 1}行 物料{materialNo} 数量={qty}, 最优: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
 
                     this.View.Model.SetValue("FFHBZLB", best.FFHBZLB, i);
                     this.View.Model.SetValue("FFHBZSL", bestPerBox, i);
@@ -115,7 +111,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                             }
 
                             int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
-                            groupBoxOffset[boxGroupKey] = boxOffset + actualBoxes;
+                            boxOffsets[boxGroupKey] = boxOffset + actualBoxes;
                         }
                     }
                 }
@@ -159,7 +155,7 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                     return;
                 }
 
-                var groupBoxOffset = new Dictionary<string, int>();
+                var boxOffsets = new Dictionary<string, int>();
 
                 for (int i = 0; i < entries.Count; i++)
                 {
@@ -205,7 +201,7 @@ WHERE FCP = '{materialId}'
                     log.WriteLog($"  第{i + 1}行 物料{materialNo} 数量={qty}, 匹配规格: {ffhbzlb}/{ffhbzgg}, 每箱{ffhbzsl}");
 
                     var boxGroupKey = $"{ffhbzlb}|{ffhbzgg}|{fscbzgg}";
-                    int boxOffset = groupBoxOffset.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+                    int boxOffset = boxOffsets.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
 
                     var serials = entries[i][serialPropName] as DynamicObjectCollection;
                     if (serials == null || serials.Count == 0)
@@ -228,7 +224,7 @@ WHERE FCP = '{materialId}'
                     }
 
                     int totalBoxes = (int)Math.Ceiling(boxedCount / ffhbzsl);
-                    groupBoxOffset[boxGroupKey] = boxOffset + totalBoxes;
+                    boxOffsets[boxGroupKey] = boxOffset + totalBoxes;
                     log.WriteLog($"  第{i + 1}行 物料{materialNo} 箱次重新分配完成: {boxedCount}/{serials.Count}个序列号分{totalBoxes}箱, 每箱{ffhbzsl}个");
                 }
 
@@ -253,7 +249,7 @@ WHERE FCP = '{materialId}'
 
         private static bool IsNo(string s)
         {
-            return s == "否";
+            return s == "2";
         }
     }
 }
