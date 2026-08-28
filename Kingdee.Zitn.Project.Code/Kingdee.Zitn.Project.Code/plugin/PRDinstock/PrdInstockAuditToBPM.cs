@@ -1,19 +1,22 @@
-﻿using Kingdee.BOS.Core.DynamicForm;
+﻿using Kingdee.BOS.BizTipsInfo;
+using Kingdee.BOS.Core.DynamicForm;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.BOS.WebApi.Client;
-using Newtonsoft.Json.Linq;
+using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Web.UI.WebControls;
 using static Kingdee.K3.MFG.App.AppServiceContext;
-using Kingdee.Zitn.Project.Code.conf;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
 {
@@ -119,19 +122,31 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                         JsonConvert.SerializeObject(dataToSend);
 
                     string apiUrl =
-                        //"http://10.0.32.10:8769/api/public/aftersale/noticeSend";
-                        "http://10.0.128.10:8081/api/public/aftersale/noticeSend";
+                        "http://10.0.32.10:8769/api/public/aftersale/noticeSend";
 
                     string responseText;
                     bool success = CallApi(apiUrl, jsonBody, out responseText);
 
                     if (success)
                     {
-                        _log.WriteLog($"推送成功，运单号: {sequenceNo}，响应: {responseText}");
+                        _log.WriteLog($"推送成功，运单号: {sequenceNo}，URL:{apiUrl},,,响应: {responseText}");
                     }
                     else
                     {
-                        _log.WriteLog($"推送失败，运单号: {sequenceNo}，响应: {responseText}");
+                        _log.WriteLog($"推送失败，运单号: {sequenceNo}，URL:{apiUrl},,,响应: {responseText}");
+
+                        string pluginUrl = "Kingdee.Zitn.Project.Code.plugin.PRDinstock.PrdInstockAuditToBPM";
+                        string operationType = sequenceNo.StartsWith("KF") ? "客返单" : "报检单";
+                        string exceptionMessage = string.IsNullOrWhiteSpace(responseText) ? "接口无响应" : responseText;
+                        SendMsg.Send($@"🚨【紧急】【生产入库审核】BpmApi推送异常！
+
+                                操作单据：{operationType}
+                                单号：{sequenceNo}
+                                时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                                异常信息：{exceptionMessage}
+                                插件：{pluginUrl}
+                                提示：请核查kingdeeLog");
+
                         failedList.Add(sequenceNo);
                     }
                 }

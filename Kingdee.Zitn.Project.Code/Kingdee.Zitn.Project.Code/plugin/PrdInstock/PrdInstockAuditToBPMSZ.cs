@@ -2,10 +2,13 @@
 using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
+using Kingdee.BOS.Core.Objects.Metadata;
+using Kingdee.BOS.Core.Util;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.BOS.WebApi.Client;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -232,7 +235,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                         WHEN B.FCPSYB =3 THEN '三部：传感技术事业部'
                         WHEN B.FCPSYB =4 THEN '事业四部'
                         WHEN B.FCPSYB =11 THEN '事业五部'
-                      END AS SYB
+                      END AS SYB,
+                     M.F_PAEZ_SYB AS MATSYB
                     FROM T_PRD_INSTOCK A
                     JOIN T_PRD_INSTOCKENTRY B ON A.FID = B.FID
                     JOIN T_PRD_INSTOCKENTRY_A BA ON B.FENTRYID = BA.FENTRYID
@@ -266,6 +270,21 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                     step = "提取BPM字段";
                     string rkdzz = GetStr(matchedItem, "RKDZZ") ?? "";          // 入库组织
                     string cpsybName = GetStr(matchedItem, "SYB") ?? "";        // 产品事业部(名称)
+                    if (string.IsNullOrWhiteSpace(cpsybName))
+                    {
+                        // 入库单分录事业部(FCPSYB)为空时，回退取物料上的事业部字段 F_PAEZ_SYB
+                        string matSyb = GetStr(matchedItem, "MATSYB") ?? "";
+                        var sybFallbackMap = new Dictionary<string, string>
+                        {
+                            { "1", "一部：民品事业部" },
+                            { "2", "二部：军品电子事业部" },
+                            { "3", "三部：传感技术事业部" },
+                            { "4", "事业四部" },
+                            { "11", "事业五部" },
+                        };
+                        cpsybName = sybFallbackMap.TryGetValue(matSyb, out var fallbackName)
+                            ? fallbackName : "";
+                    }
                     string matCode = GetStr(matchedItem, "MATERIALCODE") ?? ""; // 物料编码
                     string materialname = GetStr(matchedItem, "MATERIALNAME") ?? "";   // 物料名称
                     string materialspec = GetStr(matchedItem, "MATERIALSPEC") ?? "";   // 物料规格
@@ -518,6 +537,17 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                             _log.WriteLog($"【处理失败】生产订单号={scddBillNo}, 物料编码={matCode}, " +
                                 $"入库单号={billno}, errcode={errcode}, errmsg={errmsg}, " +
                                 $"完整BPM响应: {workflowResult}");
+                            string pluginUrl = "Kingdee.Zitn.Project.Code.plugin.PRDinstock.PrdInstockAuditToBPMSZ";
+
+                            SendMsg.Send($@"🚨【紧急】【生产入库审核】BPM发起流程失败！
+
+                                操作单据：“ 试制总结”
+                                入库单号：{billno}
+                                时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                                异常信息：{errmsg}
+                                插件：{pluginUrl}
+                                提示：请核查kingdeeLog");
+
                             // 调用失败 → 抛出异常，携带BPM返回的错误信息
                             throw new KDBusinessException($"失败", "BPM发起流程失败: errcode={errcode}, errmsg={errmsg}, " +
                                 $"生产订单号={scddBillNo}, 物料编码={matCode},错误信息{errmsg}");
@@ -533,6 +563,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                         _log.Error($"内部异常: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}");
                     // ex.ToString() 含完整异常链(内部异常)与堆栈，比 ex.StackTrace 信息更全
                     _log.Error($"完整异常: {ex}");
+                    SendMsg.Send($@"🚨【紧急】【生产入库审核】BPM发起流程失败！
+                        操作单据：“ 试制总结”
+                        入库单号：{scddBillNo},物料：{materialCode}
+                        时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                        当前步骤：{step}
+                        异常信息：{ex.Message}
+                        异常类型：{ex.GetType().Name}
+                        提示：请核查kingdeeLog");
                     throw;
                 }
             }

@@ -4,6 +4,7 @@ using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -69,20 +70,29 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 string jsonBody = JsonConvert.SerializeObject(dataToSend);
 
                 string apiUrl =
-                        //"http://10.0.32.10:8769/api/public/aftersale/noticeSend";
-                        "http://10.0.128.10:8081/api/public/aftersale/noticeSend";
-
+                        "http://10.0.32.10:8769/api/public/aftersale/noticeSend";
                 string responseText;
                 bool success = CallApi(apiUrl, jsonBody, out responseText);
 
                 if (success)
                 {
-                    _log.WriteLog($"推送成功，运单号: {sequenceNo}，响应: {responseText}");
+                    _log.WriteLog($"推送成功，运单号: {sequenceNo}，URL:{apiUrl},,,/响应: {responseText}");
                     this.View.ShowMessage("推送BpmApi成功！");
                 }
                 else
                 {
-                    _log.WriteLog($"推送失败，运单号: {sequenceNo}，响应: {responseText}");
+                    _log.WriteLog($"推送失败，运单号: {sequenceNo}，URL:{apiUrl},,,响应: {responseText}");
+                    string pluginUrl = "Kingdee.Zitn.Project.Code.plugin.PRDinstock.PrdInstockBtnToBPM";
+                    string operationType = sequenceNo.StartsWith("KF") ? "客返单" : "报检单";
+                    string exceptionMessage = string.IsNullOrWhiteSpace(responseText) ? "接口无响应" : responseText;
+                    SendMsg.Send($@"🚨【紧急】【生产入库】BpmApi手工推送异常！
+
+                                操作单据：{operationType}
+                                单号：{sequenceNo}
+                                时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                                响应：{exceptionMessage}
+                                插件：{pluginUrl}
+                                提示：请核查kingdeeLog");
                     this.View.ShowErrMessage($"接口调用失败！\n返回信息：{responseText}");
                 }
             }
@@ -91,6 +101,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 _log.Error("按钮补偿插件异常");
                 _log.Error(ex);
                 this.View.ShowErrMessage($"系统异常：{ex.Message}");
+                SendMsg.Send($"🚨【紧急】【生产入库】BpmApi推送异常！\n\n异常信息：{ex.Message}\n\n堆栈信息：{ex.StackTrace}", ex);
             }
         }
 
@@ -232,6 +243,7 @@ GROUP BY B.FMATERIALID", fysdjh);
                 responseText = ex.Message;
                 _log.Error($"API调用异常，URL: {url}");
                 _log.Error(ex);
+                SendMsg.Send($"🚨【紧急】【生产入库】调用API异常！URL: {url}\n\n异常信息：{ex.Message}\n\n堆栈信息：{ex.StackTrace}", ex);
                 return false;
             }
         }
