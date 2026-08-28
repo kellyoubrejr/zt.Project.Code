@@ -5,6 +5,7 @@ using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Orm.Metadata.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -65,7 +66,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                 {
                     log.WriteLog($"开始处理: {billNo}, FID={fid}");
 
-                    var groupBoxOffset = new Dictionary<string, int>();
+                    var boxOffsets = new Dictionary<string, int>();
 
                     for (int i = 0; i < entries.Count; i++)
                     {
@@ -125,6 +126,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                         int minBoxes = best.BoxCount;
                         decimal bestPerBox = best.PerBox;
 
+                        var boxGroupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
+                        int boxOffset = boxOffsets.TryGetValue(boxGroupKey, out var existingOffset) ? existingOffset : 0;
+
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 数量={realQty}, 最优方案: {best.FFHBZLB}/{best.FFHBZGG}, 每箱{bestPerBox}, 共{minBoxes}箱");
 
                         entry["FFHBZLB"] = best.FFHBZLB;
@@ -135,9 +139,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                         SetRefField(entry, "FSCBZGG", best.FSCBZGG);
 
                         log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次信息已设置到单据体");
-
-                        var groupKey = $"{best.FFHBZLB}|{best.FFHBZGG}|{best.FSCBZGG}";
-                        int boxOffset = groupBoxOffset.TryGetValue(groupKey, out var existingOffset) ? existingOffset : 0;
 
                         if (!string.IsNullOrEmpty(serialPropName))
                         {
@@ -162,7 +163,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                             }
 
                             int actualBoxes = (int)Math.Ceiling(boxedCount / bestPerBox);
-                            groupBoxOffset[groupKey] = boxOffset + actualBoxes;
+                            boxOffsets[boxGroupKey] = boxOffset + actualBoxes;
                             log.WriteLog($"  EntryID={entryId} 物料{materialNo} 箱次分配完成: {boxedCount}/{serials.Count}个序列号分{actualBoxes}箱, 每箱{bestPerBox}个(剩余为典试件不交付实物，未参与装箱)");
                         }
                     }
@@ -174,6 +175,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
                     log.Error($"{billNo} (FID={fid}) 箱次计算异常");
                     log.Error(ex);
                 }
+
+                //SendMsg.Send($@"🚨【紧急】【销售出库单】箱次计算异常！
+
+                //        单号： {billNo}
+                //        时间： {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                //        状态： 计算失败，立即人工介入！
+                //        提示： 测试异常，请核查基础数据。");
             }
 
             log.Section("箱次计算结束");
@@ -188,7 +196,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 
         private static bool IsNo(string s)
         {
-            return s == "否";
+            return s == "2";
         }
 
         private static void SetRefField(DynamicObject entry, string fieldName, string idValue)
