@@ -19,6 +19,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
     public class MesService : AbstractWebApiBusinessService
     {
         private  string materialId = string.Empty;
+        private static readonly CustomLog.LogWriter _log = CustomLog.For("MesService");
         public MesService(KDServiceContext context)
             : base(context)
         {
@@ -725,6 +726,80 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
             catch (Exception ex)
             {
                 return new { StatusCode = 500, Message = "服务器错误: " + ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// 查询其他订单信息
+        /// </summary>
+        /// <param name="order">订单号</param>
+        /// <returns>查询结果</returns>
+        public object GetOtherOrder(string order)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+            {
+                return new
+                {
+                    StatusCode = 401,
+                    Message = "超时，请重新登录"
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(order))
+            {
+                return new
+                {
+                    StatusCode = 400,
+                    Message = "订单号参数不能为空"
+                };
+            }
+
+            try
+            {
+                // 调用存储过程 SP_SelectionOrser
+                string sql = $"EXEC SP_SelectionOrser '{order.Trim().Replace("'", "''")}'";
+                var result = DBUtils.ExecuteDataSet(ctx, sql);
+
+                if (result == null || result.Tables.Count == 0 || result.Tables[0].Rows.Count == 0)
+                {
+                    return new
+                    {
+                        StatusCode = 404,
+                        Message = "未找到相关订单信息"
+                    };
+                }
+
+                var dataList = new List<Dictionary<string, object>>();
+                foreach (DataRow row in result.Tables[0].Rows)
+                {
+                    var rowDict = new Dictionary<string, object>();
+                    foreach (DataColumn column in result.Tables[0].Columns)
+                    {
+                        rowDict[column.ColumnName] = row[column];
+                    }
+                    dataList.Add(rowDict);
+                }
+
+                return new
+                {
+                    StatusCode = 200,
+                    Message = "查询成功",
+                    Data = dataList,
+                    ApiName = System.Reflection.MethodBase.GetCurrentMethod().Name
+                };
+            }
+            catch (Exception ex)
+            {
+                // 记录异常日志
+                _log?.Error($"查询其他订单信息异常，订单号：{order}，错误：{ex.Message}");
+                _log?.Error(ex);
+                
+                return new
+                {
+                    StatusCode = 500,
+                    Message = $"服务器错误: {ex.Message}"
+                };
             }
         }
 
