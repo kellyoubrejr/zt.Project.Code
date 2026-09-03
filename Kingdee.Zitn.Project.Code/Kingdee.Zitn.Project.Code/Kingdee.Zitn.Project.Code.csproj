@@ -141,6 +141,8 @@
     <Compile Include="Interface\ToBPM\BpmService.cs" />
     <Compile Include="Interface\ToMES\MesService.cs" />
     <Compile Include="Interface\ToOther\OtherService.cs" />
+    <Compile Include="Interface\ToOther\StatelessOtherService.cs" />
+    <Compile Include="Interface\ToOther\WeComHttpHandler.cs" />
     <Compile Include="Interface\ToPLM\PlmService.cs" />
     <Compile Include="plugin\Assem\AssemSubmitJudgeOpe.cs" />
     <Compile Include="plugin\BillOrListPlugin\BillButtonEvent.cs" />
@@ -226,6 +228,7 @@
     <Compile Include="Schedule\SFBillPicturePull.cs" />
     <Compile Include="Schedule\SFBillSync.cs" />
     <Compile Include="models\ErpDataDict.cs" />
+    <Compile Include="models\WeComUserMapping.cs" />
     <Compile Include="Schedule\TransferApplyAndTransferDirectBatch.cs" />
     <Compile Include="Util\SendMsg.cs" />
     <Compile Include="Util\Tools.cs" />
