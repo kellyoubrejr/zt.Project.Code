@@ -150,6 +150,7 @@
     <Compile Include="plugin\BillOrListPlugin\EntityAddOrCopyOrDelButton.cs" />
     <Compile Include="plugin\BillOrListPlugin\ListOpenFromTest.cs" />
     <Compile Include="plugin\BillOrListPlugin\ListUnAuditListColor.cs" />
+    <Compile Include="plugin\BillOrListPlugin\OpenBill.cs" />
     <Compile Include="plugin\BLPCZD\BLPCZDSubmitCheckMtrlNum.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushOutStock.cs" />
     <Compile Include="plugin\DeliveryNotice\DeliveryNoticePushTransferDirect.cs" />
