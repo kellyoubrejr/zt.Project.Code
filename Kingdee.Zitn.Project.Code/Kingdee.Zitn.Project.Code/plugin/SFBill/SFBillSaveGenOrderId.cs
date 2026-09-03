@@ -4,6 +4,7 @@ using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using System;
 using System.ComponentModel;
 
@@ -38,6 +39,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 {
                     _log.Error($"生成客户订单号异常，FID={dataEntity?["Id"]}");
                     _log.Error(ex);
+                    SendMsg.Send($"【物流面单】生成客户订单号异常，FID={dataEntity?["Id"]}", ex);
                 }
             }
         }

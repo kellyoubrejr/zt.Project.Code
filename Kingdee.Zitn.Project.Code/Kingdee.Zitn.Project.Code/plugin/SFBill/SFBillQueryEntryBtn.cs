@@ -3,6 +3,7 @@ using Kingdee.BOS.Core.Bill.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -42,6 +43,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error(ex);
                 this.View.ShowErrMessage("查询失败：" + ex.Message);
+                SendMsg.Send("【物流面单】手动查询失败", ex);
             }
         }
 
@@ -61,6 +63,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error(ex);
                 this.View.ShowErrMessage("图片注册失败：" + ex.Message);
+                SendMsg.Send("【物流面单】图片注册失败", ex);
             }
         }
 
@@ -89,6 +92,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             if (!apiResult.Success || apiResult.MsgData == null)
             {
                 this.View.ShowErrMessage("路由查询失败：" + apiResult.ErrorCode + " " + apiResult.ErrorMsg);
+                SendMsg.Send($"【物流面单】路由查询失败：{waybillNo}，{apiResult.ErrorCode} {apiResult.ErrorMsg}");
                 return;
             }
 
@@ -116,6 +120,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error("模型写入路由失败");
                 _log.Error(ex);
+                SendMsg.Send("【物流面单】路由写入界面失败", ex);
             }
 
             // 2. 再用 SQL 写库兜底
@@ -147,6 +152,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             if (!apiResult.Success || apiResult.MsgData == null)
             {
                 this.View.ShowErrMessage("费用查询失败：" + apiResult.ErrorCode + " " + apiResult.ErrorMsg);
+                SendMsg.Send($"【物流面单】费用查询失败：{waybillNo}，{apiResult.ErrorCode} {apiResult.ErrorMsg}");
                 return;
             }
 
@@ -167,6 +173,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error("模型写入费用失败");
                 _log.Error(ex);
+                SendMsg.Send("【物流面单】费用写入界面失败", ex);
             }
 
             // 2. 再用 SQL 写库兜底
@@ -209,7 +216,10 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             if (apiResult.Success)
                 this.View.ShowMessage($"{typeName}图片注册成功 (imgType={imgType})");
             else
+            {
                 this.View.ShowErrMessage($"{typeName}图片注册失败：" + apiResult.ErrorCode + " " + apiResult.ErrorMsg);
+                SendMsg.Send($"【物流面单】{typeName}图片注册失败：{waybillNo}，{apiResult.ErrorCode} {apiResult.ErrorMsg}");
+            }
         }
 
         /// <summary>单据头复选框是否勾选（FPZHC/FZZHD）</summary>
@@ -267,6 +277,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"查询签收状态失败，运单号={waybillNo}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】查询签收状态失败，运单号={waybillNo}", ex);
                 return false;
             }
         }
@@ -363,6 +374,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"回写运费总额失败，FID={fid}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】回写运费总额失败，FID={fid}", ex);
             }
         }
 
@@ -385,6 +397,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"写入报文单据体失败，FID={fid}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】写入报文单据体失败，FID={fid}", ex);
             }
         }
 

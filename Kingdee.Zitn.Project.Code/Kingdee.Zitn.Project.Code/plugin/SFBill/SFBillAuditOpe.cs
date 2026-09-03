@@ -4,6 +4,7 @@ using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -38,6 +39,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 {
                     _log.Error($"处理单据异常，FID={dataEntity?["Id"]}");
                     _log.Error(ex);
+                    SendMsg.Send($"【物流面单】审核下单处理异常，FID={dataEntity?["Id"]}", ex);
                 }
             }
         }
@@ -45,6 +47,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
         /// <summary>对单个面单执行顺丰下单（带单号下单）</summary>
         private void ProcessCreateOrder(long fid)
         {
+            
             // 1. 查询单据头（审核前已提交，数据已落库）
             var heads = DBUtils.ExecuteDynamicObject(this.Context,
                 $@"/*dialect*/SELECT FBillNo, FSFYDH, FSJR, FSJRDH, FSJRDZ, FJJR, FJJRDH, FJJRDZ, FKHDDH,
@@ -65,7 +68,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             string receiverPhone = Str(row, "FSJRDH");
             string receiverAddr = Str(row, "FSJRDZ");
 
-            _log.Section($"开始顺丰下单：{billNo} (FID={fid})");
+            _log.Section($"开始顺丰下单：{billNo} (FID={fid})"); 
+            
 
             // 2. 必填校验
             //【自动分配运单号】isGenWaybillNo=1 时 FSFYDH 由顺丰返回、无需录入，故跳过此项校验。
@@ -80,18 +84,21 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.WriteLog("收件人(FSJR)为空，跳过下单");
                 UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "收件人为空");
+                SendMsg.Send($"【物流面单】下单失败：{billNo}，收件人为空");
                 return;
             }
             if (string.IsNullOrEmpty(receiverPhone))
             {
                 _log.WriteLog("收件人电话(FSJRDH)为空，跳过下单");
                 UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "收件人电话为空");
+                SendMsg.Send($"【物流面单】下单失败：{billNo}，收件人电话为空");
                 return;
             }
             if (string.IsNullOrEmpty(receiverAddr))
             {
                 _log.WriteLog("收件人地址(FSJRDZ)为空，跳过下单");
                 UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "收件人地址为空");
+                SendMsg.Send($"【物流面单】下单失败：{billNo}，收件人地址为空");
                 return;
             }
 
@@ -164,6 +171,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.WriteLog($"下单失败：{apiResult.ErrorCode} {apiResult.ErrorMsg}");
                 UpdateHeadStatus(fid, "C", "", "", apiResult.RequestId, DateTime.Now, apiResult.ErrorMsg);
+                SendMsg.Send($"【物流面单】下单失败：{billNo}，错误：{apiResult.ErrorCode} {apiResult.ErrorMsg}");
             }
         }
 
@@ -280,6 +288,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"回写单据头状态失败，FID={fid}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】回写单据头状态失败，FID={fid}", ex);
             }
         }
 
@@ -295,6 +304,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"回写运单号失败，FID={fid}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】回写运单号失败，FID={fid}", ex);
             }
         }
 
@@ -317,6 +327,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 _log.Error($"写入报文单据体失败，FID={fid}");
                 _log.Error(ex);
+                SendMsg.Send($"【物流面单】写入报文单据体失败，FID={fid}", ex);
             }
         }
 
