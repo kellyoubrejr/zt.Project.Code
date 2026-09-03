@@ -32,35 +32,67 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
 
             if (falg)
             {
-                throw new KDBusinessException("采购订单已存在合同号，不能推送BPM合同审核签章接口，请检查！", "采购订单已存在合同号，不能推送BPM合同审核签章接口，请检查！");
+                WriteLog($"单据 {poBillno} 已存在合同号，跳过推送");
+                this.View.ShowMessage("采购订单已存在合同号，跳过推送");
+                WritePushStatus(poBillno, false, "采购订单已存在合同号，跳过推送");
+                return;
+            }
+
+            var requestList = GetPurchaseOrderData(poBillno);
+
+            string jsonBody = JsonConvert.SerializeObject(requestList);
+            string apiUrl = "http://10.0.32.10:8769/api/public/contractAuditSeal/generatePurchaseOrder";
+
+            WriteLog("========== 开始手动推送新版 ==========");
+            WriteLog($"单据: {poBillno}");
+            WriteLog($"请求URL: {apiUrl}");
+            WriteLog($"请求数据: {jsonBody}");
+            LogEmptyFields(requestList);
+
+            bool success = CallPostApi(apiUrl, jsonBody, out string response);
+
+            if (!success)
+            {
+                WriteLog($"推送完成！返回信息: {response}");
+                WriteLog("========== 推送结束 ==========");
             }
             else
             {
-                var requestList = GetPurchaseOrderData(poBillno);
+                WriteLog($"推送完成！返回结果: {response}");
+                WriteLog("========== 推送结束 ==========");
+            }
 
-                string jsonBody = JsonConvert.SerializeObject(requestList);
-                //string apiUrl = "http://10.0.128.10:8081/api/public/contractAuditSeal/startWorkflowInstance";
-                string apiUrl = "http://10.0.32.10:8769/api/public/contractAuditSeal/generatePurchaseOrder";
+            WritePushStatus(poBillno, success, response);
+        }
 
-                WriteLog("========== 开始手动推送新版 ==========");
-                WriteLog($"单据: {poBillno}");
-                WriteLog($"请求URL: {apiUrl}");
-                WriteLog($"请求数据: {jsonBody}");
-                LogEmptyFields(requestList);
+        private static string Sql(string s)
+        {
+            return string.IsNullOrEmpty(s) ? "" : s.Replace("'", "''");
+        }
 
-                bool success = CallPostApi(apiUrl, jsonBody, out string response);
-
-                if (!success)
+        /// <summary>
+        /// 回写推送状态与返回信息，便于排查
+        /// </summary>
+        private void WritePushStatus(string poBillno, bool success, string response)
+        {
+            try
+            {
+                string status = success ? "成功" : "失败";
+                string info = response ?? "";
+                if (info.Length > 255)
                 {
-                    WriteLog($"推送完成！返回信息: {response}");
-                    WriteLog("========== 推送结束 ==========");
-                    //throw new KDBusinessException("调用合同审核签章接口失败:", $"错误信息：{response}，请处理");
+                    info = info.Substring(0, 255);
                 }
-                else
-                {
-                    WriteLog($"推送完成！返回结果: {response}");
-                    WriteLog("========== 推送结束 ==========");
-                }
+
+                string updSql = $@"/*dialect*/UPDATE T_PUR_POORDER
+                                    SET FTSSTATUS = '{Sql(status)}', FFHXX = '{Sql(info)}'
+                                    WHERE FBILLNO = '{Sql(poBillno)}'";
+                DBUtils.Execute(this.Context, updSql);
+                WriteLog($"推送状态回写成功：FTSSTATUS={status}");
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"推送状态回写失败：{ex.Message}");
             }
         }
 
