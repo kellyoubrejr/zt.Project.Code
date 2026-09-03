@@ -1,8 +1,8 @@
 using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.Bill.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
+using Kingdee.BOS.Core.DynamicForm.PlugIn.ControlModel;
 using Kingdee.BOS.Orm.DataEntity;
-using Kingdee.BOS.Orm.Metadata.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
 using Kingdee.Zitn.Project.Code.Util;
@@ -20,11 +20,15 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
         private const string ScanEntityKey = "F_ZMER_Entity_83g";
         private const string EntryEntityKey = "FBillEntry";
         private const string SerialEntityKey = "FSerialSubEntity";
-        private const string DeliveredFlagField = "FDSJJFSW";
+
+        private bool _isBackfilling;
 
         public override void DataChanged(DataChangedEventArgs e)
         {
             base.DataChanged(e);
+
+            if (_isBackfilling)
+                return;
 
             if (!e.Field.Key.EqualsIgnoreCase("FSMNR"))
                 return;
@@ -36,6 +40,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
             var log = CustomLog.For("直接调拨单");
             log.Section("扫码回填");
 
+            _isBackfilling = true;
             try
             {
                 var scanEntity = this.View.BusinessInfo.GetEntryEntity(ScanEntityKey);
@@ -46,16 +51,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                 if (scanData == null || e.Row < 0 || e.Row >= scanData.Count)
                     return;
 
-                var scanRow = scanData[e.Row];
-
                 // 1. 取第一个#之前的包装序列号（P为固定字符）
                 var fbzxLH = fsmnr.Split('#')[0].Trim();
                 if (string.IsNullOrEmpty(fbzxLH))
                     return;
 
-                // 2. 反查包装箱标签，取物料编码 + 本箱包含的序列号
-                var box = ResolveBoxInfo(fbzxLH);
-                if (string.IsNullOrEmpty(box.MaterialNo))
+                // 2. 反查包装箱标签，取该箱包含的所有 物料+序列号 对
+                var pairs = ResolveBoxPairs(fbzxLH);
+                if (pairs.Count == 0)
                 {
                     var msg = $"扫码回填失败：包装序列号 {fbzxLH} 未找到对应包装箱标签";
                     log.Error(msg);
@@ -63,50 +66,75 @@ namespace Kingdee.Zitn.Project.Code.plugin.TransferDirect
                     return;
                 }
 
-                // 3. 从单据体找到该物料的物料内码
-                long materialId = FindMaterialId(box.MaterialNo);
-                if (materialId == 0)
+                // 3. 箱次：按审核同逻辑（最优规格 + 跨物料累加）计算 物料#序列号 -> 箱次
+                var boxNoMap = BuildBoxNoMap();
+
+                // 4. 回填字段用第一条有效规格；逐对回填，当前扫码行放第一对，其余插入下方
+                var specCache = new Dictionary<long, (string FFHBZLB, string FFHBZGG, string FSCBZGG, decimal PerBox)>();
+                int filled = 0;
+
+                for (int i = 0; i < pairs.Count; i++)
                 {
-                    var msg = $"扫码回填失败：物料 {box.MaterialNo} 不在当前单据中";
-                    log.Error(msg);
-                    SendMsg.Send($"【直接调拨单】{msg}");
-                    return;
+                    var pair = pairs[i];
+
+                    long materialId = FindMaterialId(pair.MaterialNo);
+                    if (materialId == 0)
+                    {
+                        var msg = $"扫码回填失败：物料 {pair.MaterialNo} 不在当前单据中";
+                        log.Error(msg);
+                        SendMsg.Send($"【直接调拨单】{msg}");
+                        continue;
+                    }
+
+                    if (!specCache.TryGetValue(materialId, out var spec))
+                    {
+                        spec = GetFirstSpec(materialId);
+                        specCache[materialId] = spec;
+                    }
+                    if (spec.PerBox <= 0)
+                    {
+                        var msg = $"扫码回填失败：物料 {pair.MaterialNo} 无有效包装规格";
+                        log.Error(msg);
+                        SendMsg.Send($"【直接调拨单】{msg}");
+                        continue;
+                    }
+
+                    int boxNo = boxNoMap.TryGetValue(pair.MaterialNo + "#" + pair.Serial, out var b) ? b : 1;
+
+                    int rowIndex;
+                    if (filled == 0)
+                    {
+                        rowIndex = e.Row;
+                    }
+                    else
+                    {
+                        rowIndex = this.View.Model.GetEntryRowCount(ScanEntityKey);
+                        this.View.Model.CreateNewEntryRow(ScanEntityKey);
+                    }
+
+                    this.View.Model.SetValue("FSMWL", pair.MaterialNo, rowIndex);
+                    this.View.Model.SetValue("FSMXLH", pair.Serial, rowIndex);
+                    if (filled > 0)
+                        this.View.Model.SetValue("FSMNR", fsmnr, rowIndex);
+                    this.View.Model.SetValue("FSMFHBZLB", spec.FFHBZLB, rowIndex);
+                    this.View.Model.SetValue("FSMFHBZGG", spec.FFHBZGG, rowIndex);
+                    this.View.Model.SetValue("FSMSCBZGG", spec.FSCBZGG, rowIndex);
+                    this.View.Model.SetValue("FSMFHBZSL", spec.PerBox, rowIndex);
+                    this.View.Model.SetValue("FSMXC", boxNo, rowIndex);
+
+                    log.WriteLog($"扫码内容={fsmnr}，物料={pair.MaterialNo}，序列号={pair.Serial}，规格={spec.FFHBZLB}/{spec.FFHBZGG}/{spec.FSCBZGG}，每箱={spec.PerBox}，箱次={boxNo}");
+
+                    filled++;
                 }
 
-                // 4. 查询该物料第一条有效包装规格
-                var specSql = $@"/*dialect*/SELECT FFHBZLB, FFHBZGG, FSCBZGG1, FFHBZSL1
-FROM ZMER_BZGGQD
-WHERE FCP = '{materialId}'
-  AND FDOCUMENTSTATUS = 'C' AND FFORBIDSTATUS = 'A'
-  AND FFHBZSL1 > 0
-ORDER BY FFHBZLB, FSCBZGG1, FCP";
-                var specs = DBUtils.ExecuteDynamicObject(this.Context, specSql);
-                if (specs == null || specs.Count == 0)
-                {
-                    var msg = $"扫码回填失败：物料 {box.MaterialNo} 无有效包装规格";
-                    log.Error(msg);
-                    SendMsg.Send($"【直接调拨单】{msg}");
-                    return;
-                }
+                RemoveEmptyScanRows();
 
-                var ffhbzlb = Convert.ToString(specs[0]["FFHBZLB"] ?? "").Trim();
-                var ffhbzgg = Convert.ToString(specs[0]["FFHBZGG"] ?? "").Trim();
-                var fscbzgg = Convert.ToString(specs[0]["FSCBZGG1"] ?? "").Trim();
-                var ffhbzsl = Convert.ToDecimal(specs[0]["FFHBZSL1"] ?? 0);
-
-                // 5. 回填到扫码行
-                scanRow["FSMFHBZLB"] = ffhbzlb;
-                SetRefField(scanRow, "FSMFHBZGG", ffhbzgg);
-                SetRefField(scanRow, "FSMSCBZGG", fscbzgg);
-                scanRow["FSMFHBZSL"] = ffhbzsl;
-
-                // 6. 箱次：按序列号分箱（与审核算箱逻辑一致）
-                int boxNo = CalcBoxNo(box.MaterialNo, box.Serials);
-                scanRow["FSMXC"] = boxNo;
-
-                log.WriteLog($"扫码内容={fsmnr}，物料={box.MaterialNo}，规格={ffhbzlb}/{ffhbzgg}/{fscbzgg}，每箱={ffhbzsl}，箱次={boxNo}");
-
+                // 末尾追加空白行并定位聚焦到 FSMNR，方便直接扫下一箱
+                int nextRow = this.View.Model.GetEntryRowCount(ScanEntityKey);
+                this.View.Model.CreateNewEntryRow(ScanEntityKey);
                 this.View.UpdateView();
+                this.View.GetControl<EntryGrid>(ScanEntityKey).SetFocusRowIndex(nextRow);
+                this.View.GetControl("FSMNR").SetFocus();
             }
             catch (Exception ex)
             {
@@ -114,32 +142,43 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
                 log.Error(ex);
                 SendMsg.Send($"【直接调拨单】扫码回填异常：{fsmnr}", ex);
             }
+            finally
+            {
+                _isBackfilling = false;
+            }
 
             log.Section("扫码回填结束");
         }
 
-        /// <summary>反查包装箱标签，返回该包装序列号对应的 物料编码 + 本箱序列号列表</summary>
-        private (string MaterialNo, List<string> Serials) ResolveBoxInfo(string fbzxLH)
+        /// <summary>反查包装箱标签，返回该包装序列号对应的 物料编码+序列号 对列表</summary>
+        private List<(string MaterialNo, string Serial)> ResolveBoxPairs(string fbzxLH)
         {
             var sql = $@"/*dialect*/SELECT B.FWLNUM, B.FXLH
 FROM ZMER_t_Cust100031 A
 INNER JOIN ZMER_t_Cust_Entry100089 B ON A.FID = B.FID
 WHERE A.FBZXLH = '{fbzxLH.Replace("'", "''")}'";
             var dt = DBUtils.ExecuteDynamicObject(this.Context, sql);
+            var pairs = new List<(string MaterialNo, string Serial)>();
             if (dt == null || dt.Count == 0)
-                return ("", new List<string>());
+                return pairs;
 
-            string materialNo = "";
-            var serials = new List<string>();
             for (int i = 0; i < dt.Count; i++)
             {
-                if (string.IsNullOrEmpty(materialNo))
-                    materialNo = Convert.ToString(dt[i]["FWLNUM"] ?? "").Trim();
-                var xlh = Convert.ToString(dt[i]["FXLH"] ?? "").Trim();
-                if (!string.IsNullOrEmpty(xlh))
-                    serials.Add(xlh);
+                var materialNo = Convert.ToString(dt[i]["FWLNUM"] ?? "").Trim();
+                var serial = Convert.ToString(dt[i]["FXLH"] ?? "").Trim();
+                if (!string.IsNullOrEmpty(materialNo))
+                    pairs.Add((materialNo, serial));
             }
-            return (materialNo, serials);
+
+            pairs.Sort((a, b) =>
+            {
+                int cmp = string.Compare(a.MaterialNo, b.MaterialNo, StringComparison.OrdinalIgnoreCase);
+                if (cmp != 0)
+                    return cmp;
+                return string.Compare(SerialSortKey(a.Serial), SerialSortKey(b.Serial), StringComparison.Ordinal);
+            });
+
+            return pairs;
         }
 
         /// <summary>按物料编码从单据体找物料内码</summary>
@@ -164,24 +203,43 @@ WHERE A.FBZXLH = '{fbzxLH.Replace("'", "''")}'";
             return 0;
         }
 
-        /// <summary>
-        /// 箱次：按审核算箱同逻辑——遍历分录，按 发货包装类别|发货包装规格|生产包装规格 分组维护跨物料偏移，
-        /// 交付序列号降序排序后每 perBox 个序列号为一箱，箱次 = 组内偏移 + 物料内序号 + 1（同组合跨物料连续累加）。
-        /// </summary>
-        private int CalcBoxNo(string targetMaterialNo, List<string> targetBoxSerials)
+        /// <summary>查询该物料第一条有效包装规格（回填字段用）</summary>
+        private (string FFHBZLB, string FFHBZGG, string FSCBZGG, decimal PerBox) GetFirstSpec(long materialId)
         {
+            var sql = $@"/*dialect*/SELECT FFHBZLB, FFHBZGG, FSCBZGG1, FFHBZSL1
+FROM ZMER_BZGGQD
+WHERE FCP = '{materialId}'
+  AND FDOCUMENTSTATUS = 'C' AND FFORBIDSTATUS = 'A'
+  AND FFHBZSL1 > 0
+ORDER BY FFHBZLB, FSCBZGG1, FCP";
+            var specs = DBUtils.ExecuteDynamicObject(this.Context, sql);
+            if (specs == null || specs.Count == 0)
+                return (null, null, null, 0);
+
+            var ffhbzlb = Convert.ToString(specs[0]["FFHBZLB"] ?? "").Trim();
+            var ffhbzgg = Convert.ToString(specs[0]["FFHBZGG"] ?? "").Trim();
+            var fscbzgg = Convert.ToString(specs[0]["FSCBZGG1"] ?? "").Trim();
+            var ffhbzsl = Convert.ToDecimal(specs[0]["FFHBZSL1"] ?? 0);
+            return (ffhbzlb, ffhbzgg, fscbzgg, ffhbzsl);
+        }
+
+        /// <summary>
+        /// 读取当前单据序列号子实体上已落库的箱次 FXC，返回 物料#序列号 -> 箱次 映射。
+        /// 扫码发生在保存之后，箱次已按审核逻辑计算并落库，直接按物料+序列号读取，不再重算。
+        /// </summary>
+        private Dictionary<string, int> BuildBoxNoMap()
+        {
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
             var entryEntity = this.View.BusinessInfo.GetEntryEntity(EntryEntityKey);
             var serialEntity = this.View.BusinessInfo.GetEntryEntity(SerialEntityKey);
             if (entryEntity == null || serialEntity == null)
-                return 1;
+                return map;
             var serialPropName = serialEntity.DynamicObjectType.Name;
 
             var entries = this.View.Model.GetEntityDataObject(entryEntity);
             if (entries == null || entries.Count == 0)
-                return 1;
-
-            var targetBoxSet = new HashSet<string>(targetBoxSerials, StringComparer.OrdinalIgnoreCase);
-            var boxOffsets = new Dictionary<string, int>();
+                return map;
 
             for (int i = 0; i < entries.Count; i++)
             {
@@ -189,70 +247,41 @@ WHERE A.FBZXLH = '{fbzxLH.Replace("'", "''")}'";
                 if (m == null)
                     continue;
                 var materialNo = Convert.ToString(m["Number"]);
-                long materialId = Convert.ToInt64(m["Id"]);
-
-                // 该物料第一条有效包装规格
-                var specSql = $@"/*dialect*/SELECT FFHBZLB, FFHBZGG, FSCBZGG1, FFHBZSL1
-FROM ZMER_BZGGQD
-WHERE FCP = '{materialId}'
-  AND FDOCUMENTSTATUS = 'C' AND FFORBIDSTATUS = 'A'
-  AND FFHBZSL1 > 0
-ORDER BY FFHBZLB, FSCBZGG1, FCP";
-                var specs = DBUtils.ExecuteDynamicObject(this.Context, specSql);
-                if (specs == null || specs.Count == 0)
-                    continue;
-
-                var groupKey = $"{Convert.ToString(specs[0]["FFHBZLB"] ?? "").Trim()}|{Convert.ToString(specs[0]["FFHBZGG"] ?? "").Trim()}|{Convert.ToString(specs[0]["FSCBZGG1"] ?? "").Trim()}";
-                decimal perBox = Convert.ToDecimal(specs[0]["FFHBZSL1"] ?? 0);
-                if (perBox <= 0)
-                    continue;
-
-                int boxOffset = boxOffsets.TryGetValue(groupKey, out var off) ? off : 0;
 
                 var serials = entries[i][serialPropName] as DynamicObjectCollection;
                 if (serials == null || serials.Count == 0)
                     continue;
 
-                var delivered = serials
-                    .Where(s => !IsNo(Convert.ToString(s[DeliveredFlagField])))
-                    .OrderByDescending(s => SerialSortKey(Convert.ToString(s["SerialNo"] ?? "")), StringComparer.Ordinal)
-                    .ToList();
-                if (delivered.Count == 0)
-                    continue;
-
-                int actualBoxes = (int)Math.Ceiling(delivered.Count / perBox);
-                boxOffsets[groupKey] = boxOffset + actualBoxes;
-
-                if (string.Equals(materialNo, targetMaterialNo, StringComparison.OrdinalIgnoreCase))
+                for (int k = 0; k < serials.Count; k++)
                 {
-                    for (int k = 0; k < delivered.Count; k++)
-                    {
-                        if (targetBoxSet.Contains(Convert.ToString(delivered[k]["SerialNo"] ?? "")))
-                            return boxOffset + (int)(k / perBox) + 1;
-                    }
-                    return boxOffset + 1;
+                    var serialNo = Convert.ToString(serials[k]["SerialNo"] ?? "");
+                    var boxNo = Convert.ToInt32(serials[k]["FXC"] ?? 0);
+                    if (string.IsNullOrEmpty(serialNo) || boxNo <= 0)
+                        continue;
+                    map[materialNo + "#" + serialNo] = boxNo;
                 }
             }
-            return 1;
+
+            return map;
         }
 
-        /// <summary>设置基础资料引用字段（按内码）</summary>
-        private static void SetRefField(DynamicObject entry, string fieldName, string idValue)
+        /// <summary>删除扫码单据体中 FSMNR 为空的多余空行</summary>
+        private void RemoveEmptyScanRows()
         {
-            if (string.IsNullOrEmpty(idValue))
+            var scanEntity = this.View.BusinessInfo.GetEntryEntity(ScanEntityKey);
+            if (scanEntity == null)
                 return;
-            var obj = entry[fieldName] as DynamicObject;
-            if (obj == null)
+
+            var scanData = this.View.Model.GetEntityDataObject(scanEntity);
+            if (scanData == null || scanData.Count == 0)
+                return;
+
+            for (int i = scanData.Count - 1; i >= 0; i--)
             {
-                var dp = entry.DynamicObjectType.Properties[fieldName];
-                var pi = dp.GetType().GetProperty("DynamicComplexPropertyType");
-                var refType = pi?.GetValue(dp) as DynamicObjectType;
-                if (refType == null)
-                    return;
-                obj = new DynamicObject(refType);
-                entry[fieldName] = obj;
+                var fsmnr = Convert.ToString(scanData[i]["FSMNR"] ?? "").Trim();
+                if (string.IsNullOrEmpty(fsmnr))
+                    this.View.Model.DeleteEntryRow(ScanEntityKey, i);
             }
-            obj["Id"] = idValue;
         }
 
         private static string SerialSortKey(string serialNo)
@@ -260,11 +289,6 @@ ORDER BY FFHBZLB, FSCBZGG1, FCP";
             if (string.IsNullOrEmpty(serialNo))
                 return serialNo;
             return Regex.Replace(serialNo, @"\d+", m => m.Value.PadLeft(20, '0'));
-        }
-
-        private static bool IsNo(string s)
-        {
-            return s == "2";
         }
     }
 }
