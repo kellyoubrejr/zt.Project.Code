@@ -63,16 +63,16 @@ namespace Kingdee.Zitn.Project.Code.conf
         public static string MonthlyCard   => Pick(Dev.MonthlyCard, Prod.MonthlyCard);
 
         /// <summary>图片推送解密密钥（丰桥控制台「图片注册及推送接口」页获取的 AES 密钥）</summary>
-        public static string PictureSecret => Get("SF_PictureSecret", "");
+        public static string PictureSecret => Get("SF_PictureSecret", "axjGikUwgYVKiJ3A");
 
         /// <summary>图片落盘目录（接收顺丰图片推送后保存图片的物理路径）</summary>
         public static string PictureDir    => Get("SF_PictureDir", "D:\\SFImage\\");
 
-        /// <summary>顺丰图片中转服务地址（公网可达，如 https://ziti.kingdee.com:8080）</summary>
-        public static string MiddleServiceUrl => Get("SF_MiddleServiceUrl", "");
+        /// <summary>顺丰图片中转服务地址（公网可达）</summary>
+        public static string MiddleServiceUrl => Get("SF_MiddleServiceUrl", "http://10.0.128.10:8771");
 
-        /// <summary>顺丰图片中转服务访问令牌（与中转服务 App.config 的 token 一致）</summary>
-        public static string MiddleServiceToken => Get("SF_MiddleServiceToken", "");
+        /// <summary>顺丰图片中转服务访问令牌（与中间服务 AUTH_CONFIG.api_key 一致）</summary>
+        public static string MiddleServiceToken => Get("SF_MiddleServiceToken", "sf-image-service-2024-secure-key");
 
         public static string SenderName     => Pick(Dev.SenderName, Prod.SenderName);
         public static string SenderPhone    => Pick(Dev.SenderPhone, Prod.SenderPhone);
