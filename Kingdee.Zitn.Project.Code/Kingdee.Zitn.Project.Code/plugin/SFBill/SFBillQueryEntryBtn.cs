@@ -9,6 +9,10 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Kingdee.Zitn.Project.Code.plugin.SFBill
 {
@@ -47,7 +51,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             }
         }
 
-        /// <summary>工具栏菜单按钮：注册图片（btn_img=拍照回传，btn_page=纸质回单）</summary>
+        /// <summary>工具栏菜单按钮：注册图片（btn_img=拍照回传注册，btn_page=拍照回传下载）</summary>
         public override void AfterBarItemClick(AfterBarItemClickEventArgs e)
         {
             base.AfterBarItemClick(e);
@@ -55,15 +59,15 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             try
             {
                 if (e.BarItemKey.Equals("btn_img", StringComparison.OrdinalIgnoreCase))
-                    RegisterPicture(IMG_TYPE_PHOTO, "拍照回传", "FPZHC");
-                else if (e.BarItemKey.Equals("btn_page", StringComparison.OrdinalIgnoreCase))
-                    RegisterPicture(IMG_TYPE_PAGE, "纸质回单", "FZZHD");
+                    RegisterPicture(IMG_TYPE_PHOTO, "拍照回传注册", "FPZHC");
+                //else if (e.BarItemKey.Equals("btn_page", StringComparison.OrdinalIgnoreCase))
+                //    DownloadPicture();
             }
             catch (Exception ex)
             {
                 _log.Error(ex);
-                this.View.ShowErrMessage("图片注册失败：" + ex.Message);
-                SendMsg.Send("【物流面单】图片注册失败", ex);
+                this.View.ShowErrMessage("操作失败：" + ex.Message);
+                SendMsg.Send("【物流面单】图片操作失败", ex);
             }
         }
 
@@ -219,6 +223,119 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 this.View.ShowErrMessage($"{typeName}图片注册失败：" + apiResult.ErrorCode + " " + apiResult.ErrorMsg);
                 SendMsg.Send($"【物流面单】{typeName}图片注册失败：{waybillNo}，{apiResult.ErrorCode} {apiResult.ErrorMsg}");
+            }
+        }
+
+        /// <summary>下载电子回单图片（中件服务拉取 → AES解密 → 存D盘）</summary>
+        //private void DownloadPicture()
+        //{
+        //    long fid = GetFid();
+        //    string waybillNo = GetWaybillNo();
+        //    if (string.IsNullOrWhiteSpace(waybillNo))
+        //    {
+        //        this.View.ShowErrMessage("顺丰运单号(FSFYDH)为空，无法下载图片");
+        //        return;
+        //    }
+
+        //    // 1. 未勾选拍照回传增值服务则跳过
+        //    if (!IsChecked("FPZHC"))
+        //    {
+        //        this.View.ShowMessage("未勾选拍照回传，无需下载");
+        //        return;
+        //    }
+
+        //    // 2. 从中件服务拉取加密图片
+        //    string encrypted = FetchEncryptedContent(waybillNo);
+        //    if (string.IsNullOrEmpty(encrypted))
+        //    {
+        //        this.View.ShowErrMessage($"未找到运单 {waybillNo} 的回单图片");
+        //        return;
+        //    }
+
+        //    // 3. AES解密并保存到D盘
+        //    string outputDir = @"D:\";
+        //    string fileName = $"{waybillNo}.jpg";
+        //    string outputPath = Path.Combine(outputDir, fileName);
+
+        //    try
+        //    {
+        //        byte[] imageBytes = DecryptImage(encrypted);
+        //        File.WriteAllBytes(outputPath, imageBytes);
+        //        _log.WriteLog($"电子回单下载成功：{outputPath}");
+        //        this.View.ShowMessage($"电子回单下载成功！已保存到：{outputPath}");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _log.Error($"电子回单解密/保存失败，运单号={waybillNo}");
+        //        _log.Error(ex);
+        //        this.View.ShowErrMessage("电子回单下载失败：" + ex.Message);
+        //        SendMsg.Send($"【物流面单】电子回单下载失败：{waybillNo}", ex);
+        //    }
+        //}
+
+        /// <summary>从中件服务拉取加密图片内容</summary>
+        private string FetchEncryptedContent(string waybillNo)
+        {
+            try
+            {
+                string url = "http://10.0.128.10:8771/api/internal/picture/" + waybillNo;
+                string apiKey = "sf-image-service-2024-secure-key";
+
+                using (var client = new WebClient())
+                {
+                    client.Encoding = Encoding.UTF8;
+                    client.Headers.Add("X-Api-Key", apiKey);
+                    string json = client.DownloadString(url);
+
+                    int idx = json.IndexOf("\"EncryptedContent\":\"");
+                    if (idx < 0)
+                    {
+                        _log.WriteLog($"中件服务返回无EncryptedContent：{json}");
+                        return null;
+                    }
+                    idx += "\"EncryptedContent\":\"".Length;
+                    int end = json.IndexOf("\"", idx);
+                    if (end < 0) return null;
+
+                    return json.Substring(idx, end - idx);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"调用中件服务失败，运单号={waybillNo}");
+                _log.Error(ex);
+                return null;
+            }
+        }
+
+        /// <summary>AES/CBC/PKCS7解密（密钥axjGikUwgYVKiJ3A，IV全0）</summary>
+        private static byte[] DecryptImage(string encryptedContent)
+        {
+            const string secretKey = "axjGikUwgYVKiJ3A";
+            byte[] aesIv = new byte[16];
+
+            // 第1次Base64解码
+            byte[] firstDecode = Convert.FromBase64String(encryptedContent);
+
+            // AES/CBC/PKCS7解密
+            using (var aes = Aes.Create())
+            {
+                aes.Key = Encoding.UTF8.GetBytes(secretKey);
+                aes.IV = aesIv;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+
+                using (var decryptor = aes.CreateDecryptor())
+                using (var ms = new MemoryStream(firstDecode))
+                using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                using (var result = new MemoryStream())
+                {
+                    cs.CopyTo(result);
+                    byte[] decrypted = result.ToArray();
+                    // 第2次Base64解码得到图片字节
+                    string decryptedStr = Encoding.UTF8.GetString(decrypted);
+                    return Convert.FromBase64String(decryptedStr);
+                }
             }
         }
 
