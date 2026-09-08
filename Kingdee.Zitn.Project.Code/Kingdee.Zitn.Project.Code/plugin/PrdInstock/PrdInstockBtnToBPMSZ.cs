@@ -459,6 +459,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 _log.Error("按钮补偿插件异常");
                 _log.Error(ex);
                 this.View.ShowErrMessage($"系统异常：{ex.Message}");
+                SendMsg.Send($"🚨【紧急】【生产入库】试制流程按钮补偿插件异常！\n\n单号：{this.View.Model.GetValue("FBillNo")}\n异常信息：{ex.Message}", ex);
             }
         }
 

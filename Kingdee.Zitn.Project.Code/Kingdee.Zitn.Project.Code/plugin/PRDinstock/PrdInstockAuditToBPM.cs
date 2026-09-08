@@ -172,6 +172,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 _log.Error("审核插件异常");
                 _log.Error(ex);
                 _log.Error($"完整异常: {ex}");
+                SendMsg.Send($"🚨【紧急】【生产入库审核】BpmApi推送插件异常！\n\n异常信息：{ex.Message}\n\n完整异常：{ex}", ex);
             }
         }
 

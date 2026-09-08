@@ -4,6 +4,7 @@ using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.BOS.WebApi.Client;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -22,11 +23,12 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
 
         public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
         {
+            string ids = "";
             try
             {
                 base.AfterExecuteOperationTransaction(e);
 
-                var ids = string.Join(",",
+                ids = string.Join(",",
                     e.DataEntitys.Select(o => o[0]));
 
                 _log.Section($"提交开始，FIDs: {ids}");
@@ -108,6 +110,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
                 _log.Error("审核插件异常");
                 _log.Error(ex);
                 _log.Error($"完整异常: {ex}");
+                SendMsg.Send($"🚨【紧急】【生产入库提交】更新事业部插件异常！\n\nFIDs：{ids}\n异常信息：{ex.Message}\n\n完整异常：{ex}", ex);
             }
         }
     }
