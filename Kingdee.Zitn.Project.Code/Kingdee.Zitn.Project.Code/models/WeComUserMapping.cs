@@ -249,7 +249,7 @@ namespace Kingdee.Zitn.Project.Code.models
     { "刘庆", "LiuQing" },
     { "刘顺霞", "LiuShunXia" },
     { "刘钊聚", "LiuZhaoJu" },
-    { "李阳", "YuanJin" },
+    //{ "李阳", "YuanJin" },
     { "马彦姣", "MaYanJiao" },
     { "孟繁帅", "MengFanShuai" },
     { "孙丰丰", "SunFengFeng" },
