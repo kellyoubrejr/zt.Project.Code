@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell.exe -NoProfile -Command ' *)"
+      "Bash(powershell.exe -NoProfile -Command ' *)",
+      "Bash(ls \"E:/kingdee-reps/AES_Img/AES_Img/\")",
+      "Read(//e/kingdee-reps/AES_Img/AES_Img/**)"
     ]
   }
 }
