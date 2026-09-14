@@ -1146,23 +1146,21 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
         /// 获取BPM采购合同作废标识，清空对应采购订单合同号
         /// 支持单个或多个PO号，入参格式：["PO001","PO002"] 或 "PO001"
         /// </summary>
-        /// <param name="poList">PO号，支持JSON数组字符串或单个字符串</param>
+        /// <param name="poList">PO号，支持JSON数组或单个字符串</param>
         /// <returns>作废结果</returns>
-        public object GetCGHTFlag(string poList)
+        public object GetCGHTFlag(JToken poList)
         {
             var ctx = KDContext.Session.AppContext;
             if (ctx == null)
                 return new { StatusCode = 401, Message = "超时，请重新登录" };
 
-            if (string.IsNullOrWhiteSpace(poList))
+            if (poList == null)
                 return new { StatusCode = 400, Message = "采购订单号不能为空" };
 
             try
             {
-                var root = JToken.Parse(poList);
                 var poNumbers = new List<string>();
-
-                if (root is JArray arr)
+                if (poList is JArray arr)
                 {
                     foreach (var item in arr)
                     {
@@ -1173,7 +1171,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
                 }
                 else
                 {
-                    var val = root.ToString().Trim();
+                    var val = poList.ToString().Trim();
                     if (!string.IsNullOrWhiteSpace(val))
                         poNumbers.Add(val);
                 }
