@@ -1,4 +1,5 @@
-﻿using Kingdee.BOS.App.Data;
+﻿using Kingdee.BOS;
+using Kingdee.BOS.App.Data;
 using Kingdee.BOS.ServiceFacade.KDServiceFx;
 using Kingdee.BOS.WebApi.Client;
 using Kingdee.BOS.WebApi.ServicesStub;
@@ -7,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Dynamic;
 using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
@@ -1074,6 +1076,156 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
             }
         }
 
+
         #endregion
+
+
+
+        /// <summary>
+        /// 查询生产订单信息（调用存储过程 sp_GetProductionOrderInfoToBPM）
+        /// </summary>
+        /// <param name="salesOrderNo">销售订单号（选填，为空则查该物料全部）</param>
+        /// <param name="materialCode">物料编码（必填）</param>
+        /// <returns>生产订单列表</returns>
+        public object GetMoInfo(string salesOrderNo, string materialCode)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+                return new { StatusCode = 401, Message = "超时，请重新登录" };
+
+            if (string.IsNullOrWhiteSpace(materialCode))
+                return new { StatusCode = 400, Message = "物料编码(materialCode)不能为空" };
+
+            try
+            {
+                string salesParam = string.IsNullOrWhiteSpace(salesOrderNo)
+                    ? "NULL"
+                    : "'" + salesOrderNo.Replace("'", "''") + "'";
+
+                string sql = $"EXEC sp_GetProductionOrderInfoToBPM {salesParam}, '{materialCode.Replace("'", "''")}'";
+                var result = DBUtils.ExecuteDataSet(ctx, sql);
+
+                var dataList = new List<Dictionary<string, object>>();
+
+                if (result.Tables.Count > 0 && result.Tables[0].Rows.Count > 0)
+                {
+                    DataTable table = result.Tables[0];
+                    foreach (DataRow row in table.Rows)
+                    {
+                        var rowDict = new Dictionary<string, object>();
+                        rowDict["xsddh"] = row["XSDDH"] == DBNull.Value ? null : row["XSDDH"];         // 销售订单号
+                        rowDict["scddh"] = row["SCDDH"] == DBNull.Value ? null : row["SCDDH"];         // 生产订单号
+                        rowDict["wlnum"] = row["WLNUM"] == DBNull.Value ? null : row["WLNUM"];         // 物料编码
+                        rowDict["wlname"] = row["WLNAME"] == DBNull.Value ? null : row["WLNAME"];      // 物料名称
+                        rowDict["wlgg"] = row["WLGG"] == DBNull.Value ? null : row["WLGG"];            // 物料规格
+                        rowDict["instockQty"] = row["INSTOCKQTY"] == DBNull.Value ? 0 : row["INSTOCKQTY"]; // 已入库数量
+                        dataList.Add(rowDict);
+                    }
+                }
+
+                return new
+                {
+                    StatusCode = 200,
+                    Total = dataList.Count,
+                    Data = dataList,
+                    ApiName = System.Reflection.MethodBase.GetCurrentMethod().Name
+                };
+            }
+            catch (Exception ex)
+            {
+                return new
+                {
+                    StatusCode = 500,
+                    Message = $"服务器错误: {ex.Message}"
+                };
+            }
+        }
+
+
+        /// <summary>
+        /// 获取BPM采购合同作废标识，清空对应采购订单合同号
+        /// 支持单个或多个PO号，入参格式：["PO001","PO002"] 或 "PO001"
+        /// </summary>
+        /// <param name="poList">PO号，支持JSON数组或单个字符串</param>
+        /// <returns>作废结果</returns>
+        public object GetCGHTFlag(JToken poList)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+                return new { StatusCode = 401, Message = "超时，请重新登录" };
+
+            if (poList == null)
+                return new { StatusCode = 400, Message = "采购订单号不能为空" };
+
+            try
+            {
+                var poNumbers = new List<string>();
+                if (poList is JArray arr)
+                {
+                    foreach (var item in arr)
+                    {
+                        var val = item.ToString().Trim();
+                        if (!string.IsNullOrWhiteSpace(val))
+                            poNumbers.Add(val);
+                    }
+                }
+                else
+                {
+                    var val = poList.ToString().Trim();
+                    if (!string.IsNullOrWhiteSpace(val))
+                        poNumbers.Add(val);
+                }
+
+                if (poNumbers.Count == 0)
+                    return new { StatusCode = 400, Message = "采购订单号不能为空" };
+
+                poNumbers = poNumbers.Distinct().ToList();
+
+                var successList = new List<object>();
+                var failList = new List<object>();
+
+                foreach (var po in poNumbers)
+                {
+                    try
+                    {
+                        string upd = "/*dialect*/UPDATE T_PUR_POORDER SET FCGHTH = '' WHERE FBILLNO = @FBILLNO";
+                        List<SqlParam> paras = new List<SqlParam>
+                                        {
+                                            new SqlParam("@FBILLNO", KDDbType.String, po)
+                                        };
+                        int rows = DBUtils.Execute(ctx, upd, paras);
+
+                        if (rows > 0)
+                            successList.Add(new { PO = po, Rows = rows });
+                        else
+                            failList.Add(new { PO = po, Message = "未找到对应的采购订单" });
+                    }
+                    catch (Exception ex)
+                    {
+                        failList.Add(new { PO = po, Message = ex.Message });
+                    }
+                }
+
+                return new
+                {
+                    StatusCode = 200,
+                    Total = poNumbers.Count,
+                    SuccessCount = successList.Count,
+                    FailCount = failList.Count,
+                    SuccessList = successList,
+                    FailList = failList,
+                    Message = "ERP作废成功",
+                    ApiName = System.Reflection.MethodBase.GetCurrentMethod().Name
+                };
+            }
+            catch (Exception ex)
+            {
+                return new
+                {
+                    StatusCode = 500,
+                    Message = $"服务器错误: {ex.Message}"
+                };
+            }
+        }
     }
 }
