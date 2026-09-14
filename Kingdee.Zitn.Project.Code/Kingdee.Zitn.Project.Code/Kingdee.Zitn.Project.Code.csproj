@@ -85,6 +85,10 @@
     <Reference Include="Kingdee.BOS.WebApi.Client">
       <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.BOS.WebApi.Client.dll</HintPath>
     </Reference>
+    <Reference Include="Kingdee.BOS.WebApi.FormService, Version=9.0.434.12, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.BOS.WebApi.FormService.dll</HintPath>
+    </Reference>
     <Reference Include="Kingdee.BOS.WebApi.ServicesStub">
       <HintPath>D:\Program Files (x86)\Kingdee\K3Cloud\WebSite\Bin\Kingdee.BOS.WebApi.ServicesStub.dll</HintPath>
     </Reference>
@@ -143,6 +147,8 @@
     <Compile Include="Interface\ToOther\OtherService.cs" />
     <Compile Include="Interface\ToOther\StatelessOtherService.cs" />
     <Compile Include="Interface\ToOther\WeComHttpHandler.cs" />
+    <Compile Include="Interface\ToOther\WeComImageHandler.cs" />
+    <Compile Include="Interface\ToOther\WeComFileHandler.cs" />
     <Compile Include="Interface\ToPLM\PlmService.cs" />
     <Compile Include="plugin\Assem\AssemSubmitJudgeOpe.cs" />
     <Compile Include="plugin\BillOrListPlugin\BillButtonEvent.cs" />
@@ -207,6 +213,8 @@
     <Compile Include="plugin\SFBill\SFBillQueryEntryBtn.cs" />
     <Compile Include="plugin\SFBill\SFBillSaveGenOrderId.cs" />
     <Compile Include="plugin\SFBill\SFExpressClient.cs" />
+    <Compile Include="plugin\SFBill\SFPicture.cs" />
+    <Compile Include="plugin\SFBill\SFPictureOpe.cs" />
     <Compile Include="plugin\SFCallBack\SFCallBack.cs" />
     <Compile Include="plugin\SLTZD\ReceiveBillSaveOpe.cs" />
     <Compile Include="plugin\SLTZD\RecevieBillEntryBtnGetLot.cs" />
@@ -226,6 +234,7 @@
     <Compile Include="Schedule\JiaZhiFenLei.cs" />
     <Compile Include="Schedule\SFBillPictureSync.cs" />
     <Compile Include="Schedule\SFBillPicturePull.cs" />
+    <Compile Include="Schedule\MoInfoToBPMForSch.cs" />
     <Compile Include="Schedule\SFBillSync.cs" />
     <Compile Include="models\ErpDataDict.cs" />
     <Compile Include="models\WeComUserMapping.cs" />
