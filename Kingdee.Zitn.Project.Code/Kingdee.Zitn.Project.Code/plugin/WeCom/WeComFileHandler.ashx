@@ -1,0 +1,1 @@
+<%@ WebHandler Language="C#" Class="Kingdee.Zitn.Project.Code.Interface.ToOther.WeComFileHandler, Kingdee.Zitn.Project.Code" %>
