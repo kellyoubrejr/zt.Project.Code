@@ -46,7 +46,8 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToOther
                     string mediaId = (string)root["media_id"] ?? "";
                     string base64Data = (string)root["base64"] ?? "";
                     string toUserChinese = (string)root["toUserChinese"] ?? "";
-                    _log?.WriteLog($"解析参数: mediaId={mediaId}, toUserChinese={toUserChinese}, base64前50字符={base64Data?.Substring(0, Math.Min(base64Data.Length, 50)) ?? "空"}");
+                    string fileName = (string)root["fileName"] ?? "";
+                    _log?.WriteLog($"解析参数: mediaId={mediaId}, toUserChinese={toUserChinese}, fileName={fileName}, base64前50字符={base64Data?.Substring(0, Math.Min(base64Data.Length, 50)) ?? "空"}");
 
                     // 2. 参数验证
                     if (string.IsNullOrWhiteSpace(mediaId) && string.IsNullOrWhiteSpace(base64Data))
@@ -98,7 +99,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToOther
                                     if (string.IsNullOrWhiteSpace(mediaId) && !string.IsNullOrWhiteSpace(base64Data))
                                     {
                                         string uploadError;
-                                        mediaId = SendMsg.UploadMedia(base64Data, "image", out uploadError);
+                                        mediaId = SendMsg.UploadMedia(base64Data, "image", out uploadError, fileName);
                                         if (string.IsNullOrWhiteSpace(mediaId))
                                         {
                                             returnCode = "4000";
