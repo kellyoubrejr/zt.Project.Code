@@ -1,25 +1,26 @@
+ï»¿using Kingdee.BOS;
 using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
+using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Net;
-using System.IO;
 using System.Text;
-using Kingdee.BOS;
-using Kingdee.Zitn.Project.Code.Util;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PO
 {
-    [Description("¡¾²É¹º¶©µ¥ÉóºË·şÎñ¡¿£º²É¹º¶©µ¥ÉóºË£¬µ÷ÓÃbpm½Ó¿Ú´«Öµ")]
+    [Description("ã€é‡‡è´­è®¢å•å®¡æ ¸æœåŠ¡ã€‘ï¼šé‡‡è´­è®¢å•å®¡æ ¸ï¼Œè°ƒç”¨bpmæ¥å£ä¼ å€¼")]
     [Kingdee.BOS.Util.HotUpdate]
     public class PoAuditToBPMHT : AbstractOperationServicePlugIn
     {
-        private static readonly string LogPath = @"D:\½ğµû×Ô¶¨ÒåÈÕÖ¾ÎÄ¼ş\²É¹º¶©µ¥ÉóºËÍÆËÍBPMºÏÍ¬.txt";
+        private static readonly string LogPath = @"D:\é‡‘è¶è‡ªå®šä¹‰æ—¥å¿—æ–‡ä»¶\é‡‡è´­è®¢å•å®¡æ ¸æ¨é€BPMåˆåŒ.txt";
 
         public override void BeforeExecuteOperationTransaction(BeforeExecuteOperationTransaction e)
         {
@@ -31,7 +32,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
             bool falg = GetJudgeHTFeild(ids);
             if (falg)
             {
-                throw new KDBusinessException("²É¹º¶©µ¥ÒÑ´æÔÚºÏÍ¬ºÅ£¬²»ÄÜÍÆËÍBPMºÏÍ¬ÉóºËÇ©ÕÂ½Ó¿Ú£¬Çë¼ì²é£¡", "²É¹º¶©µ¥ÒÑ´æÔÚºÏÍ¬ºÅ£¬²»ÄÜÍÆËÍBPMºÏÍ¬ÉóºËÇ©ÕÂ½Ó¿Ú£¬Çë¼ì²é£¡");
+                throw new KDBusinessException("é‡‡è´­è®¢å•å·²å­˜åœ¨åˆåŒå·ï¼Œä¸èƒ½æ¨é€BPMåˆåŒå®¡æ ¸ç­¾ç« æ¥å£ï¼Œè¯·æ£€æŸ¥ï¼", "é‡‡è´­è®¢å•å·²å­˜åœ¨åˆåŒå·ï¼Œä¸èƒ½æ¨é€BPMåˆåŒå®¡æ ¸ç­¾ç« æ¥å£ï¼Œè¯·æ£€æŸ¥ï¼");
             }
             else
             {
@@ -41,50 +42,60 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 //string apiUrl = "http://10.0.128.10:8081/api/public/contractAuditSeal/startWorkflowInstance";
                 string apiUrl = "http://10.0.32.10:8769/api/public/contractAuditSeal/generatePurchaseOrder";
 
-                WriteLog("========== ¿ªÊ¼ÍÆËÍĞÂ°æ ==========");
-                WriteLog($"µ¥¾İID: {ids}");
-                WriteLog($"ÇëÇóURL: {apiUrl}");
-                WriteLog($"ÇëÇóÊı¾İ: {jsonBody}");
+                WriteLog("========== å¼€å§‹æ¨é€æ–°ç‰ˆ ==========");
+                WriteLog($"å•æ®ID: {ids}");
+                WriteLog($"è¯·æ±‚URL: {apiUrl}");
+                WriteLog($"è¯·æ±‚æ•°æ®: {jsonBody}");
                 LogEmptyFields(requestList);
 
                 bool success = CallPostApi(apiUrl, jsonBody, out string response);
 
                 if (!success)
                 {
-                    WriteLog($"ÍÆËÍÍê³É£¡·µ»ØĞÅÏ¢: {response}");
-                    WriteLog("========== ÍÆËÍ½áÊø ==========");
+                    WriteLog($"æ¨é€å®Œæˆï¼è¿”å›ä¿¡æ¯: {response}");
+                    WriteLog("========== æ¨é€ç»“æŸ ==========");
 
-                    // ·¢ËÍÆóÎ¢ÏûÏ¢Í¨ÖªÊ§°Ü
+                    // ä»è¿”å› JSON ä¸­æå– errmsgï¼Œå–ä¸åˆ°å°±ç”¨åŸå§‹è¿”å›
+                    string errMsg = response;
+                    try
+                    {
+                        var obj = JObject.Parse(response);
+                        errMsg = obj.Value<string>("errmsg") ?? response;
+                    }
+                    catch { }
+
+                    // å‘é€ä¼å¾®æ¶ˆæ¯é€šçŸ¥å¤±è´¥
                     try
                     {
                         string billNos = GetBillNos(ids);
-                        SendMsg.Send($@"?¡¾²É¹º¶©µ¥¡¿ÍÆËÍBPMºÏÍ¬ÉóºËÊ§°Ü£¡
+                        SendMsg.Send($@"ğŸš¨ã€é‡‡è´­è®¢å•ã€‘å®¡æ ¸æ¨é€BPMåˆåŒå¤±è´¥ï¼
 
-? ²Ù×÷µ¥¾İ£º²É¹º¶©µ¥ÉóºË
-? µ¥¾İ±àºÅ£º{billNos}
-? Ê±¼ä£º{DateTime.Now:yyyy-MM-dd HH:mm:ss}
-? ´íÎóĞÅÏ¢£º{response}
-? ½Ó¿ÚµØÖ·£º{apiUrl}
+                            æ“ä½œå•æ®ï¼šé‡‡è´­è®¢å•å®¡æ ¸
+                            å•æ®ç¼–å·ï¼š{billNos}
+                            æ—¶é—´ï¼š{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                            é”™è¯¯ä¿¡æ¯ï¼š{errMsg}
+                                    response: {response}
+                            æ¥å£åœ°å€ï¼š{apiUrl}
 
-ÌáÊ¾£ºÇë¼ì²éBPM½Ó¿Ú×´Ì¬»òÁªÏµ¹ÜÀíÔ±´¦Àí");
+                            æç¤ºï¼šè¯·æ£€æŸ¥BPMæ¥å£çŠ¶æ€æˆ–è”ç³»ç®¡ç†å‘˜å¤„ç†");
                     }
                     catch (Exception sendEx)
                     {
-                        WriteLog($"·¢ËÍÆóÎ¢ÏûÏ¢Ê§°Ü: {sendEx.Message}");
+                        WriteLog($"å‘é€ä¼å¾®æ¶ˆæ¯å¤±è´¥: {sendEx.Message}");
                     }
 
-                    //throw new KDBusinessException("µ÷ÓÃºÏÍ¬ÉóºËÇ©ÕÂ½Ó¿ÚÊ§°Ü:", $"´íÎóĞÅÏ¢£º{response}£¬Çë´¦Àí");
+                    //throw new KDBusinessException("è°ƒç”¨åˆåŒå®¡æ ¸ç­¾ç« æ¥å£å¤±è´¥:", $"é”™è¯¯ä¿¡æ¯ï¼š{response}ï¼Œè¯·å¤„ç†");
                 }
                 else
                 {
-                    WriteLog($"ÍÆËÍÍê³É£¡·µ»Ø½á¹û: {response}");
-                    WriteLog("========== ÍÆËÍ½áÊø ==========");
+                    WriteLog($"æ¨é€å®Œæˆï¼è¿”å›ç»“æœ: {response}");
+                    WriteLog("========== æ¨é€ç»“æŸ ==========");
                 }
             }
         }
 
         /// <summary>
-        /// ¸ù¾İµ¥¾İID»ñÈ¡µ¥¾İ±àºÅ
+        /// æ ¹æ®å•æ®IDè·å–å•æ®ç¼–å·
         /// </summary>
         private string GetBillNos(string ids)
         {
@@ -95,7 +106,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 if (result != null && result.Count > 0)
                 {
                     var billNos = result.Select(r => r["FBILLNO"]?.ToString()).Where(n => !string.IsNullOrEmpty(n));
-                    return string.Join("¡¢", billNos);
+                    return string.Join("ã€", billNos);
                 }
             }
             catch { }
@@ -111,7 +122,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
         }
 
         /// <summary>
-        /// °²È«»ñÈ¡×Ö·û´®Öµ£¬null/DBNull ·µ»Ø¿Õ×Ö·û´®
+        /// å®‰å…¨è·å–å­—ç¬¦ä¸²å€¼ï¼Œnull/DBNull è¿”å›ç©ºå­—ç¬¦ä¸²
         /// </summary>
         private static string SafeStr(DynamicObject obj, string field)
         {
@@ -121,11 +132,11 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
         }
 
         /// <summary>
-        /// ²éÑ¯²É¹º¶©µ¥Êı¾İ
+        /// æŸ¥è¯¢é‡‡è´­è®¢å•æ•°æ®
         /// </summary>
         private List<Dictionary<string, object>> GetPurchaseOrderData(string ids)
         {
-            // Ö÷²éÑ¯£ºPO + ÎïÁÏ£¨²»JOIN¸¶¿î¼Æ»®£¬±ÜÃâµÑ¿¨¶û»ı£©
+            // ä¸»æŸ¥è¯¢ï¼šPO + ç‰©æ–™ï¼ˆä¸JOINä»˜æ¬¾è®¡åˆ’ï¼Œé¿å…ç¬›å¡å°”ç§¯ï¼‰
             string poSql = $@"/*dialect*/SELECT DISTINCT
                                             B.FENTRYID AS FENTRYID,
                                             A.FBILLNO AS PONO,
@@ -141,29 +152,29 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                                         CASE
 
                                             WHEN M.FUSEORGID = '1' THEN
-                                            'ÇàµºÖÇÌÚ¿Æ¼¼ÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™ºè…¾ç§‘æŠ€æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '101006' THEN
-                                            'ÇàµºÖÇÌÚÎ¢µç×ÓÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™ºè…¾å¾®ç”µå­æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '101007' THEN
-                                            'ÇàµºÖÇÌÚµçÔ´ÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™ºè…¾ç”µæºæœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '101050' THEN
                                             'test'
                                             WHEN M.FUSEORGID = '1404303' THEN
-                                            'ÇàµºÖÇÌÚ·éĞĞÄÜÔ´ÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™ºè…¾çƒ½è¡Œèƒ½æºæœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '1516310' THEN
-                                            'Çàµº¾§Ó¢µç×Ó¿Æ¼¼ÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™¶è‹±ç”µå­ç§‘æŠ€æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '3149866' THEN
-                                            'ÇàµºÖÇÌÚÎ¢µç×ÓÓĞÏŞ¹«Ë¾±±¾©·Ö¹«Ë¾'
+                                            'é’å²›æ™ºè…¾å¾®ç”µå­æœ‰é™å…¬å¸åŒ—äº¬åˆ†å…¬å¸'
                                             WHEN M.FUSEORGID = '3241152' THEN
-                                            'Çàµº¼ÓËÙ¶ÈÖÇÄÜ¿Æ¼¼ÓĞÏŞ¹«Ë¾'
+                                            'é’å²›åŠ é€Ÿåº¦æ™ºèƒ½ç§‘æŠ€æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '4032930' THEN
-                                            'ÇàµºÖÇÌÚÎ¢µç×ÓÓĞÏŞ¹«Ë¾Î÷°²·Ö¹«Ë¾'
+                                            'é’å²›æ™ºè…¾å¾®ç”µå­æœ‰é™å…¬å¸è¥¿å®‰åˆ†å…¬å¸'
                                             WHEN M.FUSEORGID = '4665868' THEN
-                                            'ÇàµºÖÇµ¼µç×ÓÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ™ºå¯¼ç”µå­æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '4665869' THEN
-                                            'ÇàµºÉî¿Æî£Ì½¼¼ÊõÓĞÏŞ¹«Ë¾'
+                                            'é’å²›æ·±ç§‘ç¿æ¢æŠ€æœ¯æœ‰é™å…¬å¸'
                                             WHEN M.FUSEORGID = '4852744' THEN
-                                            'ÇàµºÖÇµ¼µç×ÓÓĞÏŞ¹«Ë¾±±¾©·Ö¹«Ë¾'
+                                            'é’å²›æ™ºå¯¼ç”µå­æœ‰é™å…¬å¸åŒ—äº¬åˆ†å…¬å¸'
                                             END AS POORG,
                                             FALLAMOUNT AS ALLPRICE,
                                             FQTY AS QTY,
@@ -197,22 +208,22 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                             WHERE
                               A.FID IN ({ids})";
 
-            // ¸¶¿î¼Æ»®¶ÀÁ¢²éÑ¯£º±ÜÃâÓëÎïÁÏ±í²úÉúµÑ¿¨¶û»ı
+            // ä»˜æ¬¾è®¡åˆ’ç‹¬ç«‹æŸ¥è¯¢ï¼šé¿å…ä¸ç‰©æ–™è¡¨äº§ç”Ÿç¬›å¡å°”ç§¯
             string paySql = $@"/*dialect*/SELECT
                                             A.FID AS POID,
                                         CASE
 
                                             WHEN B2.F_ZMER_COMBO_QTR = '1' THEN
-                                            '¶¨½ğ'
+                                            'å®šé‡‘'
                                             WHEN B2.F_ZMER_COMBO_QTR = '2' THEN
-                                            '¿îµ½·¢»õ'
+                                            'æ¬¾åˆ°å‘è´§'
                                             WHEN B2.F_ZMER_COMBO_QTR = '3' THEN
-                                            'Èë¿âºóÕËÆÚ¸¶¿î'
+                                            'å…¥åº“åè´¦æœŸä»˜æ¬¾'
                                             WHEN B2.F_ZMER_COMBO_QTR = '4' THEN
-                                            'Æ±ºóÕËÆÚ¸¶¿î'
+                                            'ç¥¨åè´¦æœŸä»˜æ¬¾'
                                             WHEN B2.F_ZMER_COMBO_QTR = '5' THEN
-                                            'ÖÊ±£½ğ'
-                                            ELSE 'ÎŞ'
+                                            'è´¨ä¿é‡‘'
+                                            ELSE 'æ— '
                                             END AS FKFS,
                                             B2.FYFRATIO AS YFBL
                                         FROM
@@ -224,7 +235,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
             DynamicObjectCollection POcol = DBUtils.ExecuteDynamicObject(this.Context, poSql);
             DynamicObjectCollection PAYcol = DBUtils.ExecuteDynamicObject(this.Context, paySql);
 
-            // °´ÕÕPOID·Ö×é
+            // æŒ‰ç…§POIDåˆ†ç»„
             var poGroups = new Dictionary<string, Dictionary<string, object>>();
             var materialsGroups = new Dictionary<string, List<Dictionary<string, object>>>();
             var paymentGroups = new Dictionary<string, List<Dictionary<string, object>>>();
@@ -273,7 +284,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                     paymentGroups[poId] = new List<Dictionary<string, object>>();
                 }
 
-                // °´Ã÷Ï¸ĞĞIDÈ¥ÖØ£º±ÜÃâ¹©Ó¦ÉÌÒøĞĞ/ÁªÏµÈËµÈ1¶Ô¶à±í²úÉúµÄÖØ¸´ĞĞ
+                // æŒ‰æ˜ç»†è¡ŒIDå»é‡ï¼šé¿å…ä¾›åº”å•†é“¶è¡Œ/è”ç³»äººç­‰1å¯¹å¤šè¡¨äº§ç”Ÿçš„é‡å¤è¡Œ
                 string fentryId = SafeStr(obj, "FENTRYID");
                 string wlnum = SafeStr(obj, "WLNUM");
                 bool matExists = false;
@@ -312,7 +323,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 }
             }
 
-            // ¸¶¿î¼Æ»®¶ÀÁ¢´¦Àí£º´Ó¶ÀÁ¢²éÑ¯½á¹ûÖĞ¶ÁÈ¡£¬È¥ÖØ
+            // ä»˜æ¬¾è®¡åˆ’ç‹¬ç«‹å¤„ç†ï¼šä»ç‹¬ç«‹æŸ¥è¯¢ç»“æœä¸­è¯»å–ï¼Œå»é‡
             foreach (DynamicObject obj in PAYcol)
             {
                 string poId = obj["POID"]?.ToString();
@@ -385,11 +396,11 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
 
         private string ConvertToChineseAmountFallback(decimal amount)
         {
-            if (amount == 0) return "ÁãÔªÕû";
+            if (amount == 0) return "é›¶å…ƒæ•´";
 
-            string[] cnNum = { "Áã", "Ò¼", "·¡", "Èş", "ËÁ", "Îé", "Â½", "Æâ", "°Æ", "¾Á" };
-            string[] cnUnit = { "", "Ê°", "°Û", "Çª" };
-            string[] cnBigUnit = { "", "Íò", "ÒÚ" };
+            string[] cnNum = { "é›¶", "å£¹", "è´°", "å", "è‚†", "ä¼", "é™†", "æŸ’", "æŒ", "ç–" };
+            string[] cnUnit = { "", "æ‹¾", "ä½°", "ä»Ÿ" };
+            string[] cnBigUnit = { "", "ä¸‡", "äº¿" };
 
             string amountStr = Math.Round(amount, 2).ToString("F2");
             string integerPart = amountStr.Split('.')[0];
@@ -433,35 +444,35 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 {
                     if (!isZero && i > 0 && integerPart[i - 1] != '0')
                     {
-                        result.Insert(0, "Áã");
+                        result.Insert(0, "é›¶");
                     }
                 }
             }
 
             if (isZero)
             {
-                result.Append("Áã");
+                result.Append("é›¶");
             }
-            result.Append("Ôª");
+            result.Append("å…ƒ");
 
             int jiao = int.Parse(decimalPart[0].ToString());
             int fen = int.Parse(decimalPart[1].ToString());
 
             if (jiao == 0 && fen == 0)
             {
-                result.Append("Õû");
+                result.Append("æ•´");
             }
             else
             {
                 if (jiao != 0)
                 {
                     result.Append(cnNum[jiao]);
-                    result.Append("½Ç");
+                    result.Append("è§’");
                 }
                 if (fen != 0)
                 {
                     result.Append(cnNum[fen]);
-                    result.Append("·Ö");
+                    result.Append("åˆ†");
                 }
             }
 
@@ -470,14 +481,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
 
 
         /// <summary>
-        /// ¼ÇÂ¼ÇëÇóÊı¾İÖĞ¸÷×Ö¶ÎµÄ¿ÕÖµÇé¿ö£¬·½±ã¶¨Î»"²ÎÊı²»ÄÜÎª¿Õ"ÊÇÄÄ¸ö×Ö¶Î
+        /// è®°å½•è¯·æ±‚æ•°æ®ä¸­å„å­—æ®µçš„ç©ºå€¼æƒ…å†µï¼Œæ–¹ä¾¿å®šä½"å‚æ•°ä¸èƒ½ä¸ºç©º"æ˜¯å“ªä¸ªå­—æ®µ
         /// </summary>
         private static void LogEmptyFields(List<Dictionary<string, object>> requestList)
         {
             for (int i = 0; i < requestList.Count; i++)
             {
                 var order = requestList[i];
-                WriteLog($"--- µÚ{i + 1}Ìõ¶©µ¥×Ö¶Î¼ì²é ---");
+                WriteLog($"--- ç¬¬{i + 1}æ¡è®¢å•å­—æ®µæ£€æŸ¥ ---");
 
                 if (order.TryGetValue("pur", out var purObj) && purObj is Dictionary<string, object> pur)
                 {
@@ -487,7 +498,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                         bool isEmpty = val == null || (val is string s && string.IsNullOrEmpty(s));
                         if (isEmpty)
                         {
-                            WriteLog($"  [¿Õ] pur.{kv.Key} = {(val == null ? "null" : "\"\"")}");
+                            WriteLog($"  [ç©º] pur.{kv.Key} = {(val == null ? "null" : "\"\"")}");
                         }
                     }
                 }
@@ -502,7 +513,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                             bool isEmpty = val == null || (val is string s && string.IsNullOrEmpty(s));
                             if (isEmpty)
                             {
-                                WriteLog($"  [¿Õ] materials[{m}].{kv.Key} = {(val == null ? "null" : "\"\"")}");
+                                WriteLog($"  [ç©º] materials[{m}].{kv.Key} = {(val == null ? "null" : "\"\"")}");
                             }
                         }
                     }
@@ -518,13 +529,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                             bool isEmpty = val == null || (val is string s && string.IsNullOrEmpty(s));
                             if (isEmpty)
                             {
-                                WriteLog($"  [¿Õ] payment[{p}].{kv.Key} = {(val == null ? "null" : "\"\"")}");
+                                WriteLog($"  [ç©º] payment[{p}].{kv.Key} = {(val == null ? "null" : "\"\"")}");
                             }
                         }
                     }
                 }
             }
-            WriteLog("--- ×Ö¶Î¼ì²éÍê±Ï ---");
+            WriteLog("--- å­—æ®µæ£€æŸ¥å®Œæ¯• ---");
         }
 
         private static void WriteLog(string message)
@@ -540,12 +551,12 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
             }
             catch
             {
-                // ÈÕÖ¾Ğ´ÈëÊ§°Ü²»Å×Òì³££¬±ÜÃâÓ°ÏìÖ÷Á÷³Ì
+                // æ—¥å¿—å†™å…¥å¤±è´¥ä¸æŠ›å¼‚å¸¸ï¼Œé¿å…å½±å“ä¸»æµç¨‹
             }
         }
 
         /// <summary>
-        /// µ÷ÓÃPOST½Ó¿Ú
+        /// è°ƒç”¨POSTæ¥å£
         /// </summary>
         //private bool CallPostApi(string url, string jsonData, out string responseText)
         //{
@@ -600,13 +611,13 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
 
                 if (response == null)
                 {
-                    responseText = "½Ó¿ÚÎŞÏìÓ¦";
-                    WriteLog($"½Ó¿Ú·µ»ØÒì³£: ÎŞÏìÓ¦");
+                    responseText = "æ¥å£æ— å“åº”";
+                    WriteLog($"æ¥å£è¿”å›å¼‚å¸¸: æ— å“åº”");
                     return false;
                 }
 
                 int statusCode = (int)response.StatusCode;
-                WriteLog($"HTTP×´Ì¬Âë: {statusCode}");
+                WriteLog($"HTTPçŠ¶æ€ç : {statusCode}");
 
                 string body;
                 using (Stream respStream = response.GetResponseStream())
@@ -616,15 +627,34 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 }
                 response.Dispose();
 
-                WriteLog($"½Ó¿Ú·µ»ØÄÚÈİ: {body}");
+                WriteLog($"æ¥å£è¿”å›å†…å®¹: {body}");
 
                 responseText = body;
-                return statusCode == 200 && (body.Contains("success") || body.Contains("\"code\":200") || body.Contains("\"code\":0"));
+                //return statusCode == 200 && (body.Contains("success") || body.Contains("\"code\":200") || body.Contains("\"code\":0"));
+
+                if (statusCode != 200)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    var obj = JObject.Parse(body);
+                    int errcode = obj.Value<int?>("errcode") ?? -1;
+                    return errcode == 0 || errcode == 200;
+                }
+                catch
+                {
+                    // ä¸æ˜¯æ ‡å‡† JSONï¼Œé€€å›åˆ°å­—ç¬¦ä¸²åˆ¤æ–­
+                    return body.Contains("success")
+                        || body.Contains("\"errcode\":200")
+                        || body.Contains("\"errcode\":0");
+                }
             }
             catch (Exception ex)
             {
                 responseText = ex.Message;
-                WriteLog($"½Ó¿Úµ÷ÓÃÒì³£: {ex.Message}");
+                WriteLog($"æ¥å£è°ƒç”¨å¼‚å¸¸: {ex.Message}");
                 return false;
             }
         }

@@ -11,6 +11,8 @@ using System.IO;
 using System.Net;
 using System.Text;
 using Kingdee.BOS.App.Data;
+using Newtonsoft.Json.Linq;
+using Kingdee.Zitn.Project.Code.Util;
 
 namespace Kingdee.Zitn.Project.Code.plugin.PO
 {
@@ -55,6 +57,34 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
             {
                 WriteLog($"推送完成！返回信息: {response}");
                 WriteLog("========== 推送结束 ==========");
+
+                // 从返回 JSON 中提取 errmsg，取不到就用原始返回
+                string errMsg = response;
+                try
+                {
+                    var obj = JObject.Parse(response);
+                    errMsg = obj.Value<string>("errmsg") ?? response;
+                }
+                catch { }
+
+                // 发送企微消息通知失败
+                try
+                {
+                    SendMsg.Send($@"🚨【采购订单】手工推送BPM合同失败！
+
+                        操作单据：采购订单审核
+                        单据编号：{poBillno}
+                        时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                        错误信息：{errMsg}
+                                response: {response}
+                        接口地址：{apiUrl}
+
+                        提示：请检查BPM接口状态或联系管理员处理");
+                }
+                catch (Exception sendEx)
+                {
+                    WriteLog($"发送企微消息失败: {sendEx.Message}");
+                }
             }
             else
             {
@@ -98,7 +128,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
 
         private bool GetJudgeHTFeild(string poBillno)
         {
-            var jsql = string.Format($"SELECT FCGHTH FROM T_PUR_POORDER WHERE FBILLNO IN ('{poBillno}') AND FCGHTH IS NOT NULL AND FCGHTH <> ''");
+            var jsql = string.Format($"SELECT FCGHTH FROM T_PUR_POORDER WHERE FBILLNO IN ('{poBillno}') AND FDOCUMENTSTATUS = 'C' AND FCGHTH IS NOT NULL AND FCGHTH <> ''");
             DynamicObjectCollection dt = DBUtils.ExecuteDynamicObject(this.Context, jsql);
             if (dt == null || dt.Count == 0) return false;
             return true;
@@ -589,7 +619,26 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 WriteLog($"接口返回内容: {body}");
 
                 responseText = body;
-                return statusCode == 200 && (body.Contains("success") || body.Contains("\"code\":200") || body.Contains("\"code\":0"));
+                //return statusCode == 200 && (body.Contains("success") || body.Contains("\"code\":200") || body.Contains("\"code\":0"));
+
+                if (statusCode != 200)
+                                    {
+                                        return false;
+                                    }
+
+                                    try
+                                    {
+                                        var obj = JObject.Parse(body);
+                                        int errcode = obj.Value<int?>("errcode") ?? -1;
+                                        return errcode == 0 || errcode == 200;
+                                    }
+                                    catch
+                                    {
+                                        // 不是标准 JSON，退回到字符串判断
+                                        return body.Contains("success")
+                                            || body.Contains("\"errcode\":200")
+                                            || body.Contains("\"errcode\":0");
+                                    }
             }
             catch (Exception ex)
             {
