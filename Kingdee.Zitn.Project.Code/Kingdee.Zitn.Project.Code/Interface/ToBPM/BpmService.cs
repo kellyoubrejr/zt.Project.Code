@@ -1144,11 +1144,12 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
 
         /// <summary>
         /// 获取BPM采购合同作废标识，清空对应采购订单合同号
-        /// 支持单个或多个PO号，入参格式：["PO001","PO002"] 或 "PO001"
+        /// 支持单个或多个PO号，入参格式：{"poList":["PO001","PO002"]} 或 "PO001"
         /// </summary>
+        /// <param name="va">备用参数（可为空）</param>
         /// <param name="poList">PO号，支持JSON数组字符串或单个字符串</param>
         /// <returns>作废结果</returns>
-        public object GetCGHTFlag(string poList)
+        public object GetCGHTFlag(string va, string poList)
         {
             var ctx = KDContext.Session.AppContext;
             if (ctx == null)
@@ -1161,6 +1162,10 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
             {
                 var root = JToken.Parse(poList);
                 var poNumbers = new List<string>();
+
+                // 支持 {"poList":["PO001","PO002"]} 格式
+                if (root is JObject obj && obj["poList"] != null)
+                    root = obj["poList"];
 
                 if (root is JArray arr)
                 {
@@ -1183,30 +1188,33 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
 
                 poNumbers = poNumbers.Distinct().ToList();
 
-                var successList = new List<object>();
-                var failList = new List<object>();
+                var successList = new List<string>();
+                var failList = new List<string>();
 
                 foreach (var po in poNumbers)
                 {
                     try
                     {
-                        string upd = "/*dialect*/UPDATE T_PUR_POORDER SET FCGHTH = '' WHERE FBILLNO = @FBILLNO";
-                        List<SqlParam> paras = new List<SqlParam>
-                                        {
-                                            new SqlParam("@FBILLNO", KDDbType.String, po)
-                                        };
-                        int rows = DBUtils.Execute(ctx, upd, paras);
-
+                        string upd = $"/*dialect*/UPDATE T_PUR_POORDER SET FCGHTH = '' WHERE FBILLNO = '{po}'";
+                        int rows = DBUtils.Execute(ctx, upd);
                         if (rows > 0)
-                            successList.Add(new { PO = po, Rows = rows });
+                        {
+                            successList.Add(po);
+                        }
                         else
-                            failList.Add(new { PO = po, Message = "未找到对应的采购订单" });
+                        {
+                            failList.Add(po);
+                        }
                     }
                     catch (Exception ex)
                     {
-                        failList.Add(new { PO = po, Message = ex.Message });
+                        failList.Add(po);
                     }
                 }
+
+                string msg = failList.Count == 0
+                    ? $"ERP作废成功，共处理{successList.Count}个PO"
+                    : $"ERP作废完成，成功{successList.Count}个，失败{failList.Count}个";
 
                 return new
                 {
@@ -1216,7 +1224,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToBPM
                     FailCount = failList.Count,
                     SuccessList = successList,
                     FailList = failList,
-                    Message = "ERP作废成功",
+                    Message = msg,
                     ApiName = System.Reflection.MethodBase.GetCurrentMethod().Name
                 };
             }
