@@ -1,4 +1,6 @@
 ﻿using Kingdee.BOS.App.Data;
+using Kingdee.BOS.Business.Bill.Operation;
+using Kingdee.BOS.BusinessEntity.BusinessFlow;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.ServiceFacade.KDServiceFx;
 using Kingdee.BOS.WebApi.Client;
@@ -924,7 +926,7 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
                         ["InterationFlags"] = "",
                         ["IgnoreInterationFlag"] = "",
                         ["IsControlPrecision"] = "false",
-                        ["ValidateRepeatJson"] = "true",
+                        ["ValidateRepeatJson"] = "false",
                         ["Model"] = modelObj
                     };
 
@@ -939,15 +941,74 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
                     string newId = saveJObj["Result"]?["Id"]?.ToString();
                     string newNumber = saveJObj["Result"]?["Number"]?.ToString();
 
-                    if (saveOk) successCount++; else failCount++;
+                    
+                     if (!saveOk)
+                    {
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Id = "", Number = "", Message = errMsg });
+                        continue;
+                    }
 
+                    //保存成功，提交审核
+                    var submitObj = new JObject
+                    {
+                        ["CreateOrgId"] = 0,
+                        ["Numbers"] = new JArray(),
+                        ["Ids"] = newId,
+                        ["SelectedPostId"] = 0,
+                        ["UseOrgId"] = 0,
+                        ["NetworkCtrl"] = "",
+                        ["IgnoreInterationFlag"] = ""
+                    };
+
+                    var submitResult = client.Submit("ZMER_BZXBQ", submitObj.ToString());
+                    var submitJObj = JObject.Parse(submitResult);
+                    bool submitOk = submitJObj["Result"]["ResponseStatus"]["IsSuccess"].Value<bool>();
+
+                    if (!submitOk)
+                    {
+                        errMsg = submitJObj["Result"]["ResponseStatus"]["Errors"]?[0]?["Message"]?.ToString() ?? "提交错误";
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Id = newId, Number = newNumber, Message = "保存成功，提交失败: " + errMsg });
+                        continue;
+                    }
+
+                    //提交成功，审核
+                    var auditObj = new JObject
+                    {
+                        ["CreateOrgId"] = 0,
+                        ["Numbers"] = new JArray(),
+                        ["Ids"] = newId,
+                        ["InterationFlags"] = "",
+                        ["UseOrgId"] = 0,
+                        ["NetworkCtrl"] = "",
+                        ["IsVerifyProcInst"] = "true",
+                        ["IgnoreInterationFlag"] = "",
+                        ["UseBatControlTimes"] = "false"
+                    };
+
+                    var auditResult = client.Audit("ZMER_BZXBQ", auditObj.ToString());
+                    var auditJObj = JObject.Parse(auditResult);
+                    bool auditOk = auditJObj["Result"]["ResponseStatus"]["IsSuccess"].Value<bool>();
+                    if (!auditOk)
+                    {
+                        errMsg = auditJObj["Result"]["ResponseStatus"]["Errors"]?[0]?["Message"]?.ToString() ?? "审核错误";
+                        failCount++;
+                        resultList.Add(new { FBZXLH = fbzxLH, Success = false, Id = newId, Number = newNumber, Message = "保存提交成功，审核失败: " + errMsg });
+                        continue;
+                    }
+
+                    successCount++;
+                     
+
+                    //if (saveOk) successCount++; else failCount++;
                     resultList.Add(new
                     {
                         FBZXLH = fbzxLH,
-                        Success = saveOk,
+                        Success = saveOk,//saveOk ? true
                         Id = newId,
                         Number = newNumber,
-                        Message = saveOk ? "保存成功" : errMsg
+                        Message = saveOk ? "保存成功" : errMsg  
                     });
                 }
 
@@ -962,6 +1023,108 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
             }
             catch (Exception ex)
             {
+                return new { StatusCode = 500, Message = "服务器错误: " + ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// 根据包装序列号和序列号批量反审核删除包装箱标签（ZMER_BZXBQ），直接数据库操作
+        /// </summary>
+        /// <param name="fbzxLH">包装序列号（单据头）</param>
+        /// <param name="fxlh">序列号（单据体），多个逗号分隔，如 "ZT-261-014,ZT-261-016,ZT-261-024"</param>
+        public object UnAuditDel(string fbzxLH, string fxlh)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+                return new { StatusCode = 401, Message = "超时，请重新登录" };
+
+            if (string.IsNullOrWhiteSpace(fbzxLH))
+                return new { StatusCode = 400, Message = "包装序列号不能为空" };
+
+            if (string.IsNullOrWhiteSpace(fxlh))
+                return new { StatusCode = 400, Message = "序列号不能为空" };
+
+            // 解析序列号列表
+            var fxlhList = fxlh.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+            _log.Section($"开始批量反审核删除包装箱标签，FBZXLH={fbzxLH}, FXLH数量={fxlhList.Length}, FXLH列表={fxlh}");
+
+            try
+            {
+                // 直接根据FBZXLH和FXLH删除单据体记录
+                var resultList = new List<object>();
+                int successCount = 0, failCount = 0;
+                string fbzxLHEscaped = fbzxLH.Replace("'", "''");
+
+                foreach (var item in fxlhList)
+                {
+                    var trimFxlh = item.Trim();
+                    _log.WriteLog($"开始删除序列号: FXLH={trimFxlh}");
+
+                    string fxlhEscaped = trimFxlh.Replace("'", "''");
+
+                    string deleteSql = $@"/*dialect*/DELETE FROM ZMER_T_CUST_ENTRY100089 
+                                                    WHERE FID = (SELECT FID FROM ZMER_T_CUST100031 WHERE FBZXLH = '{fbzxLHEscaped}')
+                                                      AND FXLH = '{fxlhEscaped}'";
+
+                    _log.WriteLog($"删除SQL: {deleteSql}");
+                    
+                    int rowsAffected = DBUtils.Execute(ctx, deleteSql);
+                    _log.WriteLog($"删除完成，FXLH={trimFxlh}, 影响行数={rowsAffected}");
+
+                    if (rowsAffected > 0)
+                    {
+                        successCount++;
+                        resultList.Add(new { FXLH = trimFxlh, Success = true, Message = $"成功删除{rowsAffected}条记录" });
+                    }
+                    else
+                    {
+                        failCount++;
+                        resultList.Add(new { FXLH = trimFxlh, Success = false, Message = "未找到匹配的记录" });
+                    }
+                }
+
+                // 删除完成后，检查该包装序列号是否还有剩余子表记录
+                string checkSql = $@"/*dialect*/SELECT COUNT(1) AS CNT 
+                                        FROM ZMER_T_CUST_ENTRY100089 
+                                        WHERE FID = (SELECT FID FROM ZMER_T_CUST100031 WHERE FBZXLH = '{fbzxLHEscaped}')";
+                _log.WriteLog($"检查剩余明细SQL: {checkSql}");
+                var checkResult = DBUtils.ExecuteDynamicObject(ctx, checkSql);
+                int remainCount = checkResult != null && checkResult.Count > 0 ? Convert.ToInt32(checkResult[0]["CNT"]) : 0;
+                _log.WriteLog($"剩余明细行数: {remainCount}");
+
+                string headerDeleted = "否";
+                // 如果没有剩余明细，删除主表
+                if (remainCount == 0)
+                {
+                    string delHeaderSql = $@"/*dialect*/DELETE FROM ZMER_T_CUST100031 WHERE FBZXLH = '{fbzxLHEscaped}'";
+                    _log.WriteLog($"无剩余明细，删除主表SQL: {delHeaderSql}");
+                    DBUtils.Execute(ctx, delHeaderSql);
+                    headerDeleted = "是";
+                    _log.WriteLog($"主表删除成功，FBZXLH={fbzxLH}");
+                }
+                else
+                {
+                    _log.WriteLog($"还有{remainCount}条明细，保留主表");
+                }
+
+                _log.Section($"删除完成: FBZXLH={fbzxLH}, 成功{successCount}个, 失败{failCount}个, 主表是否删除={headerDeleted}");
+
+                return new
+                {
+                    StatusCode = 200,
+                    Message = $"删除完成: 成功{successCount}个, 失败{failCount}个" + (remainCount == 0 ? "，主表已全部删除" : $"，该单据还剩{remainCount}条明细"),
+                    SuccessCount = successCount,
+                    FailCount = failCount,
+                    RemainingEntryCount = remainCount,
+                    HeaderDeleted = headerDeleted,
+                    Data = resultList
+                };
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"删除异常: FBZXLH={fbzxLH}, FXLH={fxlh}, 错误={ex.Message}");
+                _log.Error(ex);
                 return new { StatusCode = 500, Message = "服务器错误: " + ex.Message };
             }
         }
