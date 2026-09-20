@@ -168,6 +168,7 @@
     <Compile Include="plugin\MoRpt\MoRptSaveUpdateMaterialXLHInfo.cs" />
     <Compile Include="plugin\Mo\MoAutoFeelMtrlFormPpbom.cs" />
     <Compile Include="plugin\Mo\MoSelection.cs" />
+    <Compile Include="plugin\Mo\MoSubmitUpsertKHInfos.cs" />
     <Compile Include="plugin\MRP\MRP_PlanHEBINGList.cs" />
     <Compile Include="plugin\MRP\MRP_PlanHEBINGList1.cs" />
     <Compile Include="plugin\MRP\MRP_PlnForceCastSaveToPlanOrderForm.cs" />
@@ -211,11 +212,8 @@
     <Compile Include="plugin\ReturnMtrl\ReturnMtrlJiaZhiFenLeiUpsert.cs" />
     <Compile Include="plugin\SFBill\SFBillAuditOpe.cs" />
     <Compile Include="plugin\SFBill\SFBillQueryEntryBtn.cs" />
-    <Compile Include="plugin\SFBill\SFBillSaveGenOrderId.cs" />
     <Compile Include="plugin\SFBill\SFExpressClient.cs" />
-    <Compile Include="plugin\SFBill\SFPicture.cs" />
     <Compile Include="plugin\SFBill\SFPictureOpe.cs" />
-    <Compile Include="plugin\SFCallBack\SFCallBack.cs" />
     <Compile Include="plugin\SLTZD\ReceiveBillSaveOpe.cs" />
     <Compile Include="plugin\SLTZD\RecevieBillEntryBtnGetLot.cs" />
     <Compile Include="plugin\SLTZD\SLTZDautoGetFLot.cs" />
@@ -231,14 +229,15 @@
     <Compile Include="plugin\TransferDirect\TransferDirectSMDataChanged.cs" />
     <Compile Include="plugin\TransferDirect\TransferDitectEntryButtonSuanBox.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Schedule\CGDDHTTOBPM.cs" />
     <Compile Include="Schedule\JiaZhiFenLei.cs" />
-    <Compile Include="Schedule\SFBillPictureSync.cs" />
-    <Compile Include="Schedule\SFBillPicturePull.cs" />
     <Compile Include="Schedule\MoInfoToBPMForSch.cs" />
-    <Compile Include="Schedule\SFBillSync.cs" />
     <Compile Include="models\ErpDataDict.cs" />
     <Compile Include="models\WeComUserMapping.cs" />
     <Compile Include="Schedule\TransferApplyAndTransferDirectBatch.cs" />
+    <Compile Include="Schedule\BPMSalesProject.cs" />
+    <Compile Include="Schedule\SFBillRouteQuerySchedule.cs" />
+    <Compile Include="Schedule\SFBillFeeQuerySchedule.cs" />
     <Compile Include="Util\SendMsg.cs" />
     <Compile Include="Util\Tools.cs" />
   </ItemGroup>
