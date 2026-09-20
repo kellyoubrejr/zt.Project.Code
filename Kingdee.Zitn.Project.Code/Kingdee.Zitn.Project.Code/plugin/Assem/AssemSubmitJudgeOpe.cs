@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using Kingdee.Zitn.Project.Code.conf;
 
 namespace Kingdee.Zitn.Project.Code.plugin.Assem
 {
@@ -14,6 +15,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
     [Kingdee.BOS.Util.HotUpdate]
     public class AssemSubmitJudgeOpe : AbstractOperationServicePlugIn
     {
+        private static readonly CustomLog.LogWriter _log = CustomLog.For("组装拆卸单批号校验");
+
         public override void BeforeExecuteOperationTransaction(BeforeExecuteOperationTransaction e)
         {
             base.BeforeExecuteOperationTransaction(e);
@@ -97,23 +100,35 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
         /// </summary>
         private void ValidateLotQty(List<string> currentIds)
         {
+            _log.WriteLog("========== 开始校验 ==========");
+            _log.WriteLog($"当前单据ID列表: {string.Join(", ", currentIds)}");
+
             var idList = string.Join(",", currentIds.Select(id => $"'{id}'"));
 
             // 1. 查询当前单据子件的物料编码、批号、数量
+            _log.WriteLog("步骤1: 查询当前单据子件的物料编码、批号、数量");
             var subItemSql = $@"
-                SELECT M.FNUMBER, C.FLOT_TEXT, C.FQTY
+                SELECT M.FNUMBER, C.FLOT_TEXT, C.FQTY,M.FMATERIALID
                 FROM T_STK_ASSEMBLY A
                 INNER JOIN T_STK_ASSEMBLYPRODUCT B ON A.FID = B.FID
                 INNER JOIN T_STK_ASSEMBLYSUBITEM C ON B.FENTRYID = C.FENTRYID
                 INNER JOIN T_BD_MATERIAL M ON C.FMATERIALID = M.FMATERIALID
+                INNER JOIN T_BD_MATERIALGROUP_L ML ON M.FMATERIALGROUP = ML.FID
                 WHERE A.FID IN ({idList})
-                    AND C.FLOT_TEXT IS NOT NULL AND C.FLOT_TEXT <> ''";
+                    AND C.FLOT_TEXT IS NOT NULL AND C.FLOT_TEXT <> '' AND ML.FNAME LIKE '%费用%'";
 
+            _log.WriteLog($"步骤1 SQL: {subItemSql}");
             var subItemResult = DBUtils.ExecuteDynamicObject(this.Context, subItemSql);
+            _log.WriteLog($"步骤1 查询结果数量: {subItemResult?.Count ?? 0}");
 
-            if (subItemResult == null || subItemResult.Count == 0) return;
+            if (subItemResult == null || subItemResult.Count == 0)
+            {
+                _log.WriteLog("步骤1: 无批号子件，跳过校验");
+                return;
+            }
 
             // 2. 收集有批号的子件信息，按物料+批号汇总当前数量
+            _log.WriteLog("步骤2: 收集有批号的子件信息，按物料+批号汇总当前数量");
             var lotItems = new Dictionary<string, decimal>();  // key=物料编码|批号, value=当前数量
             foreach (var item in subItemResult)
             {
@@ -124,6 +139,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 if (string.IsNullOrWhiteSpace(materialNumber) || string.IsNullOrWhiteSpace(lotText))
                     continue;
 
+                _log.WriteLog($"步骤2 明细: 物料={materialNumber}, 批号={lotText}, 数量={qty}");
                 var key = $"{materialNumber}|{lotText}";
                 if (lotItems.ContainsKey(key))
                     lotItems[key] += qty;
@@ -131,17 +147,30 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                     lotItems[key] = qty;
             }
 
-            if (lotItems.Count == 0) return;
+            if (lotItems.Count == 0)
+            {
+                _log.WriteLog("步骤2: 汇总后无有效批号，跳过校验");
+                return;
+            }
+
+            _log.WriteLog($"步骤2 汇总结果: 共{lotItems.Count}个物料+批号组合");
+            foreach (var kvp in lotItems)
+            {
+                _log.WriteLog($"步骤2 汇总: {kvp.Key} -> 当前数量={kvp.Value}");
+            }
 
             // 3. 构建物料+批号的查询条件
+            _log.WriteLog("步骤3: 构建物料+批号的查询条件");
             var lotConditions = lotItems.Select(kvp =>
             {
                 var parts = kvp.Key.Split('|');
                 return $"(M.FNUMBER = '{parts[0].Replace("'", "''")}' AND C.FLOT_TEXT = '{parts[1].Replace("'", "''")}')";
             });
             var lotFilter = string.Join(" OR ", lotConditions);
+            _log.WriteLog($"步骤3 查询条件: {lotFilter}");
 
             // 4. 查询批号总量（从批号主档追踪表）
+            _log.WriteLog("步骤4: 查询批号总量（从批号主档追踪表）");
             var lotQtyConditions = lotItems.Select(kvp =>
             {
                 var parts = kvp.Key.Split('|');
@@ -150,13 +179,17 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
             var lotQtyFilter = string.Join(" OR ", lotQtyConditions);
 
             var lotQtySql = $@"
-                SELECT A.FNUMBER, SUM(B.FQTY) AS TOTALQTY
+                SELECT
+                A.FNUMBER, A.FLOTID,  SUM(B.FQTY) AS TOTALQTY
                 FROM T_BD_LOTMASTER A
                 JOIN T_BD_LOTMASTERBILLTRACE B ON A.FLOTID = B.FLOTID
+                JOIN T_BD_MATERIAL M ON A.FMATERIALID = M.FMATERIALID
                 WHERE {lotQtyFilter}
-                GROUP BY A.FNUMBER";
+                GROUP BY A.FNUMBER, A.FLOTID";
 
+            _log.WriteLog($"步骤4 SQL: {lotQtySql}");
             var lotQtyResult = DBUtils.ExecuteDynamicObject(this.Context, lotQtySql);
+            _log.WriteLog($"步骤4 查询结果数量: {lotQtyResult?.Count ?? 0}");
 
             // 批号总量：key=批号编码, value=总量
             var lotTotalQty = new Dictionary<string, decimal>();
@@ -165,13 +198,70 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 foreach (var item in lotQtyResult)
                 {
                     var lotNumber = item["FNUMBER"]?.ToString();
+                    var lotId = item["FLOTID"]?.ToString();
                     var totalQty = item["TOTALQTY"] == DBNull.Value ? 0 : Convert.ToDecimal(item["TOTALQTY"]);
+                    _log.WriteLog($"步骤4 详细: 批号编码={lotNumber}, LOTID={lotId}, 入库总量={totalQty}");
                     if (!string.IsNullOrWhiteSpace(lotNumber))
                         lotTotalQty[lotNumber] = totalQty;
                 }
             }
 
+            _log.WriteLog($"步骤4 批号总量汇总: 共查到{lotTotalQty.Count}个批号的入库总量");
+            foreach (var kvp in lotTotalQty)
+            {
+                _log.WriteLog($"步骤4 总量: 批号={kvp.Key}, 入库总量={kvp.Value}");
+            }
+
+            // 4.1 如果有批号没查到总量，再单独查询T_BD_LOTMASTER看批号是否存在
+            var notFoundLots = lotItems.Keys
+                .Select(k => k.Split('|')[1])
+                .Distinct()
+                .Where(lot => !lotTotalQty.ContainsKey(lot) || lotTotalQty[lot] <= 0)
+                .ToList();
+
+            if (notFoundLots.Count > 0)
+            {
+                _log.WriteLog($"步骤4.1: 有{notFoundLots.Count}个批号未查到入库总量，单独检查批号是否存在");
+                var debugLotFilter = string.Join(",", notFoundLots.Select(l => $"'{l.Replace("'", "''")}'"));
+                var debugSql = $@"
+                    SELECT A.FLOTID, A.FNUMBER, A.FNAME
+                    FROM T_BD_LOTMASTER A
+                    WHERE A.FNUMBER IN ({debugLotFilter})";
+                _log.WriteLog($"步骤4.1 SQL: {debugSql}");
+                var debugResult = DBUtils.ExecuteDynamicObject(this.Context, debugSql);
+                _log.WriteLog($"步骤4.1 T_BD_LOTMASTER查询结果: {debugResult?.Count ?? 0}条");
+                if (debugResult != null)
+                {
+                    foreach (var item in debugResult)
+                    {
+                        _log.WriteLog($"步骤4.1 存在: LOTID={item["FLOTID"]}, 批号={item["FNUMBER"]}, 名称={item["FNAME"]}");
+                    }
+                }
+
+                // 查这些批号在追踪表里有没有数据
+                if (debugResult != null && debugResult.Count > 0)
+                {
+                    var lotIds = debugResult.Select(r => $"'{r["FLOTID"]}'").ToList();
+                    var lotIdFilter = string.Join(",", lotIds);
+                    var traceSql = $@"
+                        SELECT B.FLOTID, B.FBILLFORMID, B.FQTY
+                        FROM T_BD_LOTMASTERBILLTRACE B
+                        WHERE B.FLOTID IN ({lotIdFilter})";
+                    _log.WriteLog($"步骤4.1 追踪表SQL: {traceSql}");
+                    var traceResult = DBUtils.ExecuteDynamicObject(this.Context, traceSql);
+                    _log.WriteLog($"步骤4.1 T_BD_LOTMASTERBILLTRACE查询结果: {traceResult?.Count ?? 0}条");
+                    if (traceResult != null)
+                    {
+                        foreach (var item in traceResult)
+                        {
+                            _log.WriteLog($"步骤4.1 追踪: LOTID={item["FLOTID"]}, 单据形态={item["FBILLFORMID"]}, 数量={item["FQTY"]}");
+                        }
+                    }
+                }
+            }
+
             // 5. 查询历史已用数量（所有状态，排除当前单据）
+            _log.WriteLog("步骤5: 查询历史已用数量（所有状态，排除当前单据）");
             var historySql = $@"
                 SELECT M.FNUMBER, C.FLOT_TEXT, SUM(C.FQTY) AS USEDQTY
                 FROM T_STK_ASSEMBLY A
@@ -182,7 +272,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                     AND ({lotFilter})
                 GROUP BY M.FNUMBER, C.FLOT_TEXT";
 
+            _log.WriteLog($"步骤5 SQL: {historySql}");
             var historyResult = DBUtils.ExecuteDynamicObject(this.Context, historySql);
+            _log.WriteLog($"步骤5 查询结果数量: {historyResult?.Count ?? 0}");
 
             // 历史已用：key=物料编码|批号编码, value=已用数量
             var historyUsed = new Dictionary<string, decimal>();
@@ -202,7 +294,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 }
             }
 
+            _log.WriteLog($"步骤5 历史已用汇总: 共{historyUsed.Count}个物料+批号组合有历史用量");
+            foreach (var kvp in historyUsed)
+            {
+                _log.WriteLog($"步骤5 历史: {kvp.Key} -> 历史已用={kvp.Value}");
+            }
+
             // 6. 校验：当前数量 + 历史已用数量 <= 批号总量
+            _log.WriteLog("========== 步骤6: 逐个校验批号数量 ==========");
             var errors = new List<string>();
             foreach (var kvp in lotItems)
             {
@@ -214,6 +313,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 historyUsed.TryGetValue(kvp.Key, out decimal usedQty);
                 var totalQty = lotTotalQty.ContainsKey(lotText) ? lotTotalQty[lotText] : 0;
 
+                _log.WriteLog($"步骤6 校验物料[{materialNumber}]批号[{lotText}]:");
+                _log.WriteLog($"  当前单据数量(currentQty) = {currentQty}");
+                _log.WriteLog($"  历史已用数量(usedQty) = {usedQty}");
+                _log.WriteLog($"  批号入库总量(totalQty) = {totalQty}");
+                _log.WriteLog($"  合计需求 = {currentQty + usedQty}");
+                _log.WriteLog($"  是否有总量记录 = {(lotTotalQty.ContainsKey(lotText) ? "是" : "否")}");
+                _log.WriteLog($"  totalQty <= 0 ? {(totalQty <= 0 ? "是 -> 报错:未找到入库记录" : "否")}");
+
                 if (totalQty <= 0)
                 {
                     errors.Add($"物料[{materialNumber}]批号[{lotText}]在批号主档中未找到入库记录，请确认！");
@@ -222,7 +329,14 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 {
                     errors.Add($"物料[{materialNumber}]批号[{lotText}]数量超限：当前[{currentQty}] + 已用[{usedQty}] = [{currentQty + usedQty}] > 批号总量[{totalQty}]");
                 }
+                else
+                {
+                    _log.WriteLog($"  校验通过");
+                }
             }
+
+            _log.WriteLog("========== 校验结束 ==========");
+            _log.WriteLog($"校验结果: 错误数={errors.Count}, {string.Join(" | ", errors)}");
 
             if (errors.Count > 0)
             {
@@ -231,6 +345,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.Assem
                 foreach (var err in errors)
                     message.AppendLine(err);
 
+                _log.Error(message.ToString());
                 throw new KDBusinessException("提交失败", message.ToString());
             }
         }
