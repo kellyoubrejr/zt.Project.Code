@@ -60,7 +60,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             {
                 if (e.BarItemKey.Equals("btn_img", StringComparison.OrdinalIgnoreCase))
                     RegisterPicture(IMG_TYPE_PHOTO, "拍照回传注册", "FPZHC");
-                //else if (e.BarItemKey.Equals("btn_page", StringComparison.OrdinalIgnoreCase))
+                else if (e.BarItemKey.Equals("btn_pagedownload", StringComparison.OrdinalIgnoreCase))
+                    RegisterPicture(IMG_TYPE_PAGE, "纸质回单注册", "FZZHD");
                 //    DownloadPicture();
             }
             catch (Exception ex)

@@ -4,10 +4,12 @@ using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
 using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using Kingdee.Zitn.Project.Code.conf;
+using Kingdee.Zitn.Project.Code.models;
 using Kingdee.Zitn.Project.Code.Util;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 
 namespace Kingdee.Zitn.Project.Code.plugin.SFBill
@@ -68,18 +70,51 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             string receiverPhone = Str(row, "FSJRDH");
             string receiverAddr = Str(row, "FSJRDZ");
 
-            _log.Section($"开始顺丰下单：{billNo} (FID={fid})"); 
-            
+            var query = string.Format($@"/*dialect*/SELECT B.FNAME FROM {HEAD_TABLE} A
+                                                   LEFT JOIN V_BD_SALESMAN_L B ON A.FYWY = B.FID WHERE A.FID = {fid}");
+            var dt = DBUtils.ExecuteDynamicObject(this.Context, query);
+            if(dt == null || dt.Count == 0)
+            {
+                _log.WriteLog($"未查询到业务员，FID={fid}");
+               
+            }
+            string ywyName = Str(dt[0], "FNAME");
+
+            var dt2 = DBUtils.ExecuteDynamicObject(this.Context, $@"/*dialect*/SELECT B.FFHTZD FROM 
+                                                                ZMER_t_Cust100030 A
+                                                                JOIN 
+                                                                ZMER_t_Cust_Entry100086 B
+                                                                ON A.FID = B.FID
+                                                                WHERE A.FID = {fid}");
+
+            if (dt2 == null || dt2.Count == 0)
+            {
+                _log.WriteLog($"未查询到发货通知单号，FID={fid}");
+                
+            }
+
+            List<string> deliveryNoticeBillNoList = new List<string>();
+
+            for (int i = 0; i < dt2.Count; i++)
+            {
+                string DeliberyNoticeBillNo = Str(dt2[i], "FFHTZD");
+                deliveryNoticeBillNoList.Add(DeliberyNoticeBillNo);
+            }
+
+            string allDeliveryNoticeBillNo = string.Join(",", deliveryNoticeBillNoList);
+
+            _log.Section($"开始顺丰下单：{billNo} (FID={fid})");
+
 
             // 2. 必填校验
             //【自动分配运单号】isGenWaybillNo=1 时 FSFYDH 由顺丰返回、无需录入，故跳过此项校验。
             //【切回带单号下单】isGenWaybillNo=0 时，放开下面这段校验即可。
-            //if (string.IsNullOrEmpty(waybillNo))
-            //{
-            //    _log.WriteLog("顺丰运单号(FSFYDH)为空，跳过下单");
-            //    UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "顺丰运单号为空");
-            //    return;
-            //}
+            if (string.IsNullOrEmpty(waybillNo))
+            {
+                _log.WriteLog("顺丰运单号(FSFYDH)为空，跳过下单");
+                UpdateHeadStatus(fid, "C", "", "", "", DateTime.Now, "顺丰运单号为空");
+                return;
+            }
             if (string.IsNullOrEmpty(receiver))
             {
                 _log.WriteLog("收件人(FSJR)为空，跳过下单");
@@ -166,6 +201,27 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 string resultWaybillNo = string.IsNullOrEmpty(assignedWaybillNo) ? waybillNo : assignedWaybillNo;
                 _log.WriteLog($"下单成功：运单号={resultWaybillNo}，筛单结果={filterResult}，路由标签={routeLabel}");
                 UpdateHeadStatus(fid, "B", filterResult, routeLabel, apiResult.RequestId, DateTime.Now, "");
+                
+                
+                try
+                {
+                    
+                    string toUserChinese = ywyName; 
+                    if (!string.IsNullOrEmpty(toUserChinese))
+                    {
+                        string toUser = WeComUserMapping.GetWeComUser(toUserChinese);
+                        if (!string.IsNullOrEmpty(toUser))
+                        {
+                            string message = $"您的发货通知单{allDeliveryNoticeBillNo}已发起快递，快递单号{resultWaybillNo}，请关注。";
+                            SendMsg.Send(message, toUser);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Error($"发送企业微信通知失败，FID={fid}");
+                    _log.Error(ex);
+                }
             }
             else
             {
@@ -185,19 +241,18 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             msg["language"] = "zh-CN";
             msg["orderId"] = orderId;
             //【自动分配运单号】isGenWaybillNo=1：由顺丰分配运单号，不传 waybillNoInfoList。
-            msg["isGenWaybillNo"] = 1;
+            //msg["isGenWaybillNo"] = 1;
 
             //【切回带单号下单】isGenWaybillNo=0 时，放开下面两段：isGenWaybillNo=0 + waybillNoInfoList。
-            //msg["isGenWaybillNo"] = 0;
+            msg["isGenWaybillNo"] = 0;
 
             // 顺丰运单号列表（带单号下单时传预印面单号）
-            //var waybillList = new JArray();
-            //waybillList.Add(new JObject { ["waybillType"] = 1, ["waybillNo"] = waybillNo });
-            //msg["waybillNoInfoList"] = waybillList;
+            var waybillList = new JArray();
+            waybillList.Add(new JObject { ["waybillType"] = 1, ["waybillNo"] = waybillNo });
+            msg["waybillNoInfoList"] = waybillList;
 
-            // 托寄物（货物名称暂时写死）
             var cargoList = new JArray();
-            cargoList.Add(new JObject { ["name"] = "测试托寄物品" });
+            cargoList.Add(new JObject { ["托寄物品"] = "产品" });
             msg["cargoDetails"] = cargoList;
 
             // 收寄双方
