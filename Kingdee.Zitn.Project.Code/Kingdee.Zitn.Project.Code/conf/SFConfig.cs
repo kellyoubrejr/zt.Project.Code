@@ -27,7 +27,7 @@ namespace Kingdee.Zitn.Project.Code.conf
         private static class Dev
         {
             public static string PartnerID     => Get("SF_PartnerID", "ZTWDZ21N30S3");
-            public static string CheckWord     => Get("SF_CheckWord", "40tKLxNBerVURL3vbOkioY45M0hCUnjK");
+            public static string CheckWord => Get("SF_CheckWord", "40tKLxNBerVURL3vbOkioY45M0hCUnjK");
             public static string ApiUrl        => Get("SF_ApiUrl", "https://sfapi-sbox.sf-express.com/std/service");
             public static string MonthlyCard   => Get("SF_MonthlyCard", "7551234567");
 
@@ -43,8 +43,8 @@ namespace Kingdee.Zitn.Project.Code.conf
         /* 生产环境 */
         private static class Prod
         {
-            public static string PartnerID     => Get("SF_PartnerID", "ZTWDZUUBNMV7");
-            public static string CheckWord     => Get("SF_CheckWord", "Hd42vy0fKqeXSHql3p2teiDSqp7py2eW");
+            public static string PartnerID     => Get("SF_PartnerID", "ZTWDZ21N30S3");
+            public static string CheckWord     => Get("SF_CheckWord", "GzkAd5AsrCROKqMj9RkZWpaGGqQxe4zS");
             public static string ApiUrl        => Get("SF_ApiUrl", "https://bspgw.sf-express.com/std/service");
             public static string MonthlyCard   => Get("SF_MonthlyCard", "5325070013");
 
@@ -63,13 +63,14 @@ namespace Kingdee.Zitn.Project.Code.conf
         public static string MonthlyCard   => Pick(Dev.MonthlyCard, Prod.MonthlyCard);
 
         /// <summary>图片推送解密密钥（丰桥控制台「图片注册及推送接口」页获取的 AES 密钥）</summary>
-        public static string PictureSecret => Get("SF_PictureSecret", "axjGikUwgYVKiJ3A");
+        //public static string PictureSecret => Get("SF_PictureSecret", "axjGikUwgYVKiJ3A");
+        public static string PictureSecret => Get("SF_PictureSecret", "80db7b9057a3df35");
 
         /// <summary>图片落盘目录（接收顺丰图片推送后保存图片的物理路径）</summary>
         public static string PictureDir    => Get("SF_PictureDir", "D:\\SFImage\\");
 
         /// <summary>顺丰图片中转服务地址（公网可达）</summary>
-        public static string MiddleServiceUrl => Get("SF_MiddleServiceUrl", "http://10.0.128.10:8771");
+        public static string MiddleServiceUrl => Get("SF_MiddleServiceUrl", "http://10.0.32.67:8771");
 
         /// <summary>顺丰图片中转服务访问令牌（与中间服务 AUTH_CONFIG.api_key 一致）</summary>
         public static string MiddleServiceToken => Get("SF_MiddleServiceToken", "sf-image-service-2024-secure-key");
