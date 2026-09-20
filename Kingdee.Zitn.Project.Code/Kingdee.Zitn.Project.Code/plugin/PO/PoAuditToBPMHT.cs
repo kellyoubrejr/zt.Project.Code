@@ -75,7 +75,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                             时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
                             错误信息：{errMsg}
                                     response: {response}
-                            接口地址：{apiUrl}
 
                             提示：请检查BPM接口状态或联系管理员处理");
                     }
@@ -91,6 +90,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                     WriteLog($"推送完成！返回结果: {response}");
                     WriteLog("========== 推送结束 ==========");
                 }
+
+                // 回写推送状态与返回信息（审核插件用FID做where条件）
+                WritePushStatus(ids, success, response);
             }
         }
 
@@ -119,6 +121,37 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
             DynamicObjectCollection dt = DBUtils.ExecuteDynamicObject(this.Context, jsql);
             if (dt == null || dt.Count == 0) return false;
             return true;
+        }
+
+        /// <summary>
+        /// 回写推送状态与返回信息（审核插件用FID做where条件）
+        /// </summary>
+        private void WritePushStatus(string ids, bool success, string response)
+        {
+            try
+            {
+                string status = success ? "成功" : "失败";
+                string info = response ?? "";
+                if (info.Length > 255)
+                {
+                    info = info.Substring(0, 255);
+                }
+
+                string updSql = $@"/*dialect*/UPDATE T_PUR_POORDER
+                                    SET FTSSTATUS = '{Sql(status)}', FFHXX = '{Sql(info)}'
+                                    WHERE FID IN ({ids})";
+                DBUtils.Execute(this.Context, updSql);
+                WriteLog($"推送状态回写成功：FTSSTATUS={status}");
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"推送状态回写失败：{ex.Message}");
+            }
+        }
+
+        private static string Sql(string s)
+        {
+            return string.IsNullOrEmpty(s) ? "" : s.Replace("'", "''");
         }
 
         /// <summary>

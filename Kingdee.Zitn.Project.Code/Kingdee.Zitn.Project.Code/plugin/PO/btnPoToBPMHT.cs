@@ -29,6 +29,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 return;
 
             string poBillno = this.View.Model.GetValue("FBillNo").ToString();
+            string fdocumentStatus = this.View.Model.GetValue("FDocumentStatus").ToString();
+            WriteLog($"按钮点击触发，单据编号: {poBillno}, 单据状态: {fdocumentStatus}");
+            if (fdocumentStatus != "C") return;
 
             bool falg = GetJudgeHTFeild(poBillno);
 
@@ -77,7 +80,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                         时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}
                         错误信息：{errMsg}
                                 response: {response}
-                        接口地址：{apiUrl}
 
                         提示：请检查BPM接口状态或联系管理员处理");
                 }
