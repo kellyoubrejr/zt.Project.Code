@@ -167,6 +167,8 @@
     <Compile Include="plugin\MoRpt\MoRptAuditOpeCheck.cs" />
     <Compile Include="plugin\MoRpt\MoRptSaveUpdateMaterialXLHInfo.cs" />
     <Compile Include="plugin\Mo\MoAutoFeelMtrlFormPpbom.cs" />
+    <Compile Include="plugin\Mo\MoBillSaveOrSubmitUpsertKHFields.cs" />
+    <Compile Include="plugin\Mo\MoOpsSaveOrSubmitUpsertKHFields.cs" />
     <Compile Include="plugin\Mo\MoSelection.cs" />
     <Compile Include="plugin\Mo\MoSubmitUpsertKHInfos.cs" />
     <Compile Include="plugin\MRP\MRP_PlanHEBINGList.cs" />
