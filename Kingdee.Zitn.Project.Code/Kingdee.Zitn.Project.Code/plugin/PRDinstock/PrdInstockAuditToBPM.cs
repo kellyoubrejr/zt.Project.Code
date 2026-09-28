@@ -32,8 +32,11 @@ namespace Kingdee.Zitn.Project.Code.plugin.PRDinstock
             {
                 base.AfterExecuteOperationTransaction(e);
 
-                var ids = string.Join(",",
-                    e.DataEntitys.Select(o => o[0]));
+                //var ids = string.Join(",",
+                //    e.DataEntitys.Select(o => o[0]));
+
+                var ids = string.Join(",", e.SelectedRows
+                .Select(row => row.DataEntity["Id"]?.ToString()));
 
                 _log.Section($"审核开始，FIDs: {ids}");
 
