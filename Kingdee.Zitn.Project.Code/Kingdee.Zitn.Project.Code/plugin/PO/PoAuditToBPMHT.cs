@@ -22,12 +22,20 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
     {
         private static readonly string LogPath = @"D:\金蝶自定义日志文件\采购订单审核推送BPM合同.txt";
 
-        public override void BeforeExecuteOperationTransaction(BeforeExecuteOperationTransaction e)
+        public override void AfterExecuteOperationTransaction(AfterExecuteOperationTransaction e)
         {
-            base.BeforeExecuteOperationTransaction(e);
+            base.AfterExecuteOperationTransaction(e);
 
             var ids = string.Join(",", e.SelectedRows
     .Select(row => row.DataEntity["Id"]?.ToString()));
+
+        //    var distinctIds = e.SelectedRows
+        //.Select(row => row.DataEntity["Id"]?.ToString())
+        //.Where(id => !string.IsNullOrEmpty(id))
+        //.Distinct()
+        //.ToList();
+
+        //    var ids = string.Join(",", distinctIds);
 
             bool falg = GetJudgeHTFeild(ids);
             if (falg)
@@ -107,7 +115,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.PO
                 var result = DBUtils.ExecuteDynamicObject(this.Context, sql);
                 if (result != null && result.Count > 0)
                 {
-                    var billNos = result.Select(r => r["FBILLNO"]?.ToString()).Where(n => !string.IsNullOrEmpty(n));
+                    var billNos = result.Select(r => r["FBILLNO"]?.ToString()).Where(n => !string.IsNullOrWhiteSpace(n));
                     return string.Join("、", billNos);
                 }
             }
