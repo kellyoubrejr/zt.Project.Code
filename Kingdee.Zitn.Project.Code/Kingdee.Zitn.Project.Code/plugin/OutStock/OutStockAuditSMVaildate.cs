@@ -67,10 +67,10 @@ namespace Kingdee.Zitn.Project.Code.plugin.OutStock
 
             this.View.UpdateView();
 
-            if (hasMismatch)
-            {
-                throw new KDBusinessException("本次发货产品与出库单不一致，请检查", "本次发货产品与出库单不一致，请检查!");
-            }
+            //if (hasMismatch)
+            //{
+            //    throw new KDBusinessException("本次发货产品与出库单不一致，请检查", "本次发货产品与出库单不一致，请检查!");
+            //}
         }
 
         /// <summary>
