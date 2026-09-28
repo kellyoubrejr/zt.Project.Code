@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.Interface.ToMES
 {
@@ -1254,6 +1255,269 @@ namespace Kingdee.Zitn.Project.Code.Interface.ToMES
             foreach (var f in PpbomBodyFields)
                 keys.Add("FEntity." + f);
             return string.Join(",", keys);
+        }
+
+        /// <summary>
+        /// 根据质检员中文名查询质检员编码（从V_BD_INSPECTOR视图）
+        /// </summary>
+        /// <param name="inspectorName">质检员中文名</param>
+        /// <returns>质检员编码，找不到返回null</returns>
+        private string GetInspectorCodeByName(string inspectorName)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null) return null;
+
+            string sql = $@"/*dialect*/SELECT A.FNUMBER 
+                            FROM V_BD_INSPECTOR A 
+                            JOIN V_BD_INSPECTOR_L B ON A.FID = B.FID 
+                            WHERE B.FNAME = '{inspectorName.Replace("'", "''")}' 
+                            AND A.FBIZORGID = 101006";
+
+            var result = DBUtils.ExecuteDynamicObject(ctx, sql);
+            if (result != null && result.Count > 0)
+            {
+                return result[0]["FNUMBER"]?.ToString();
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 根据收料通知单号下推检验单，并指定质检员（支持中文名，支持多个收料单号配对多个质检员）
+        /// </summary>
+        /// <param name="billNos">收料通知单号，多个用逗号分隔，如 "BILL001,BILL002"</param>
+        /// <param name="inspectorNames">质检员中文名，支持逗号分隔多个，如 "刘杰" 或 "刘杰,王五"。
+        /// 单个质检员时所有收料单都分配给该质检员；
+        /// 多个质检员时按顺序一一对应（收料单1->质检员1，收料单2->质检员2）</param>
+        /// <returns></returns>
+        public object PushReceiveToInspect(string billNos, string inspectorNames)
+        {
+            var ctx = KDContext.Session.AppContext;
+            if (ctx == null)
+                return new { StatusCode = 401, Message = "超时，请重新登录" };
+
+            if (string.IsNullOrWhiteSpace(billNos))
+                return new { StatusCode = 400, Message = "收料通知单号不能为空" };
+
+            if (string.IsNullOrWhiteSpace(inspectorNames))
+                return new { StatusCode = 400, Message = "质检员名称不能为空" };
+
+            try
+            {
+                // 登录K3Cloud
+                var client = new K3CloudApiClient(ErpLogin.K3CloudUrl);
+                var loginResult = client.ValidateLogin(
+                    ErpLogin.AppId,
+                    ErpLogin.UserName,
+                    ErpLogin.Password,
+                    ErpLogin.Lcid
+                );
+                if (JObject.Parse(loginResult)["LoginResultType"].Value<int>() != 1)
+                    return new { StatusCode = 500, Message = "K3Cloud 登录失败" };
+
+                // 解析收料单号列表和质检员名称列表
+                var billNoArr = billNos.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var inspectorNameArr = inspectorNames.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                var resultList = new List<object>();
+                int successCount = 0, failCount = 0;
+
+                // 根据质检员中文名查询对应的编码，建立映射
+                var inspectorMapping = new Dictionary<string, string>(); // 中文名 -> 编码
+                foreach (var name in inspectorNameArr)
+                {
+                    var trimName = name.Trim();
+                    var code = GetInspectorCodeByName(trimName);
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        inspectorMapping[trimName] = code;
+                        _log.WriteLog($"质检员 '{trimName}' 对应编码: {code}");
+                    }
+                    else
+                    {
+                        _log.WriteLog($"警告: 未找到质检员 '{trimName}' 的编码");
+                    }
+                }
+
+                if (inspectorMapping.Count == 0)
+                    return new { StatusCode = 400, Message = "未找到任何有效的质检员编码，请检查质检员名称是否正确" };
+
+                // 处理每个收料通知单
+                for (int i = 0; i < billNoArr.Length; i++)
+                {
+                    var trimBillNo = billNoArr[i].Trim();
+                    _log.WriteLog($"开始处理收料通知单: {trimBillNo} (第{i + 1}条)");
+
+                    try
+                    {
+                        // 确定当前收料单对应的质检员
+                        string currentInspectorName;
+                        string currentInspectorCode;
+
+                        if (inspectorMapping.Count == 1)
+                        {
+                            // 只有一个质检员时，所有收料单都分配给该质检员
+                            currentInspectorName = inspectorMapping.Keys.First();
+                            currentInspectorCode = inspectorMapping.Values.First();
+                        }
+                        else
+                        {
+                            // 多个质检员时按索引一一对应
+                            if (i < inspectorNameArr.Length)
+                            {
+                                currentInspectorName = inspectorNameArr[i].Trim();
+                            }
+                            else
+                            {
+                                // 质检员数量不够时，循环使用最后一个
+                                currentInspectorName = inspectorNameArr[inspectorNameArr.Length - 1].Trim();
+                            }
+
+                            if (inspectorMapping.ContainsKey(currentInspectorName))
+                            {
+                                currentInspectorCode = inspectorMapping[currentInspectorName];
+                            }
+                            else
+                            {
+                                // 如果没查到该质检员编码，使用第一个有效的质检员
+                                currentInspectorName = inspectorMapping.Keys.First();
+                                currentInspectorCode = inspectorMapping.Values.First();
+                                _log.WriteLog($"警告: 质检员 '{inspectorNameArr[i].Trim()}' 未找到编码，使用默认: {currentInspectorName}");
+                            }
+                        }
+
+                        _log.WriteLog($"收料通知单 {trimBillNo} 分配质检员: {currentInspectorName}({currentInspectorCode})");
+
+                        // 1. 查询收料通知单内码
+                        string querySql = $"/*dialect*/SELECT FID FROM T_PUR_Receive WHERE FBILLNO = '{trimBillNo.Replace("'", "''")}'";
+                        var queryResult = DBUtils.ExecuteDynamicObject(ctx, querySql);
+
+                        if (queryResult == null || queryResult.Count == 0)
+                        {
+                            failCount++;
+                            resultList.Add(new { BillNo = trimBillNo, Success = false, Message = "未找到该收料通知单" });
+                            continue;
+                        }
+
+                        long fid = Convert.ToInt64(queryResult[0]["FID"]);
+                        _log.WriteLog($"收料通知单 {trimBillNo} 内码: {fid}");
+
+                        // 2. 下推检验单
+                        var pushJson = new JObject
+                        {
+                            ["Ids"] = fid.ToString(),
+                            ["Numbers"] = new JArray(),
+                            ["EntryIds"] = "",
+                            ["RuleId"] = "QM_PURReceive2Inspect",
+                            ["TargetBillTypeId"] = "",
+                            ["TargetOrgId"] = 0,
+                            ["TargetFormId"] = "QM_InspectBill",
+                            ["IsEnableDefaultRule"] = false,
+                            ["IsDraftWhenSaveFail"] = true,
+                            ["CustomParams"] = new JObject()
+                        }.ToString();
+
+                        _log.WriteLog($"下推检验单，源单ID: {fid}, RuleId: QM_PURReceive2Inspect");
+                        var pushResultJson = client.Push("PUR_ReceiveBill", pushJson);
+                        var pushJObj = JObject.Parse(pushResultJson);
+
+                        if (!pushJObj["Result"]["ResponseStatus"]["IsSuccess"].Value<bool>())
+                        {
+                            var errMsg = pushJObj["Result"]["ResponseStatus"]["Errors"]?[0]?["Message"]?.ToString() ?? "未知错误";
+                            failCount++;
+                            resultList.Add(new { BillNo = trimBillNo, Success = false, Message = "下推失败: " + errMsg });
+                            continue;
+                        }
+
+                        var successList = pushJObj["Result"]["ResponseStatus"]["SuccessEntitys"] as JArray;
+                        if (successList == null || successList.Count == 0)
+                        {
+                            failCount++;
+                            resultList.Add(new { BillNo = trimBillNo, Success = false, Message = "下推结果为空" });
+                            continue;
+                        }
+
+                        var pushItem = successList[0];
+                        long newFid = pushItem["Id"].Value<long>();
+                        string newNumber = pushItem["Number"]?.ToString() ?? "";
+                        _log.WriteLog($"下推成功，新检验单内码: {newFid}, 单号: {newNumber}");
+
+                        // 3. 保存检验单并指定质检员
+                        var modelObj = new JObject
+                        {
+                            ["FID"] = newFid,
+                            ["FInspectorId"] = new JObject { ["FNUMBER"] = currentInspectorCode }
+                        };
+
+                        var saveObj = new JObject
+                        {
+                            ["NeedUpDateFields"] = new JArray { "FInspectorId" },
+                            ["NeedReturnFields"] = new JArray(),
+                            ["IsDeleteEntry"] = "false",
+                            ["SubSystemId"] = "",
+                            ["IsVerifyBaseDataField"] = "false",
+                            ["IsEntryBatchFill"] = "true",
+                            ["ValidateFlag"] = "true",
+                            ["NumberSearch"] = "true",
+                            ["IsAutoAdjustField"] = "false",
+                            ["InterationFlags"] = "",
+                            ["IgnoreInterationFlag"] = "",
+                            ["IsControlPrecision"] = "false",
+                            ["ValidateRepeatJson"] = "false",
+                            ["Model"] = modelObj
+                        };
+
+                        _log.WriteLog($"保存检验单，设置质检员: {currentInspectorName}({currentInspectorCode})");
+                        var saveResultJson = client.Save("QM_InspectBill", saveObj.ToString());
+                        var saveJObj = JObject.Parse(saveResultJson);
+                        bool saveOk = saveJObj["Result"]["ResponseStatus"]["IsSuccess"].Value<bool>();
+
+                        if (!saveOk)
+                        {
+                            var saveErrMsg = saveJObj["Result"]["ResponseStatus"]["Errors"]?[0]?["Message"]?.ToString() ?? "未知保存错误";
+                            failCount++;
+                            resultList.Add(new { BillNo = trimBillNo, Success = false, Message = "下推成功，保存失败: " + saveErrMsg });
+                            continue;
+                        }
+
+                        successCount++;
+                        resultList.Add(new
+                        {
+                            BillNo = trimBillNo,
+                            Success = true,
+                            NewFid = newFid,
+                            NewNumber = newNumber,
+                            InspectorName = currentInspectorName,
+                            InspectorCode = currentInspectorCode,
+                            Message = $"下推成功，检验单号: {newNumber}，质检员: {currentInspectorName}"
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error($"处理收料通知单异常: {trimBillNo}");
+                        _log.Error(ex);
+                        failCount++;
+                        resultList.Add(new { BillNo = trimBillNo, Success = false, Message = "处理异常: " + ex.Message });
+                    }
+                }
+
+                _log.Section($"收料通知单下推检验单完成: 共{billNoArr.Length}条, 成功{successCount}条, 失败{failCount}条");
+
+                return new
+                {
+                    StatusCode = 200,
+                    Message = $"完成: 共{billNoArr.Length}条, 成功{successCount}条, 失败{failCount}条",
+                    SuccessCount = successCount,
+                    FailCount = failCount,
+                    InspectorMapping = inspectorMapping,
+                    Data = resultList
+                };
+            }
+            catch (Exception ex)
+            {
+                _log.Error("收料通知单下推检验单异常");
+                _log.Error(ex);
+                return new { StatusCode = 500, Message = "服务器错误: " + ex.Message };
+            }
         }
     }
 }
