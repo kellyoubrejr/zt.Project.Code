@@ -19,7 +19,7 @@ namespace Kingdee.Zitn.Project.Code.Schedule
     {
         private static readonly CustomLog.LogWriter _log = CustomLog.For("BPM销售项目同步");
 
-        private const string API_URL = "http://10.0.128.10:8081/api/public/project/kdSysSaleLead";
+        private const string API_URL = "http://10.0.32.10:8769/api/public/project/kdSysSaleLead";
         private const string TABLE_NAME = "QFJE_t_Cust100021";
 
         public void Run(Context ctx, Kingdee.BOS.Core.Schedule schedule)
@@ -30,7 +30,7 @@ namespace Kingdee.Zitn.Project.Code.Schedule
             {
                 // 1. 调用BPM接口获取销售项目数据
                 _log.WriteLog($"调用接口: {API_URL}");
-
+                 
                 string responseBody;
                 using (var httpClient = new HttpClient())
                 {
@@ -92,12 +92,11 @@ namespace Kingdee.Zitn.Project.Code.Schedule
                     try
                     {
                         // 4. 查询是否已存在
-                        string checkSql = $"SELECT COUNT(1) FROM {TABLE_NAME} WHERE FCRMID = '{crmId.Replace("'", "''")}'";
+                        string checkSql = $"SELECT 1 FROM {TABLE_NAME} WHERE FCRMID = '{crmId.Replace("'", "''")}'";
                         _log.WriteLog($"查询是否存在SQL: {checkSql}");
-                        int existCount = DBUtils.Execute(ctx, checkSql);
+                        var ds = DBUtils.ExecuteDataSet(ctx, checkSql);
 
-
-                        if (existCount > 0)
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                         {
                             _log.WriteLog($"跳过已存在: CRMID={crmId}, FNAME={fName}");
                             skipCount++;
@@ -108,19 +107,11 @@ namespace Kingdee.Zitn.Project.Code.Schedule
                                             DECLARE @NewFID INT;
                                             SET @NewFID = (SELECT ISNULL(MAX(FID), 0) + 1 FROM {TABLE_NAME});
 
-                                            DECLARE @NewFNUMBER NVARCHAR(50);
-                                            SELECT @NewFNUMBER = 'xsxm' + CAST(
-                                                ISNULL(MAX(TRY_CAST(SUBSTRING(FNUMBER, 5, LEN(FNUMBER) - 4) AS INT)), 0) + 1 
-                                                AS NVARCHAR(20)
-                                            )
-                                            FROM {TABLE_NAME}
-                                            WHERE FNUMBER LIKE 'xsxm%';
-
-                                            INSERT INTO {TABLE_NAME} 
+                                            INSERT INTO {TABLE_NAME}
                                                 (FID, FNUMBER, FDOCUMENTSTATUS, FFORBIDSTATUS, FNAME, FCRMID)
-                                            VALUES 
-                                                (@NewFID, @NewFNUMBER, 'C', 'A', 
-                                                 N'{fName.Replace("'", "''")}', 
+                                            VALUES
+                                                (@NewFID, CAST(@NewFID AS NVARCHAR(50)), 'C', 'A',
+                                                 N'{fName.Replace("'", "''")}',
                                                  '{crmId.Replace("'", "''")}');";
 
                         _log.WriteLog($"插入SQL: {insertSql}");
