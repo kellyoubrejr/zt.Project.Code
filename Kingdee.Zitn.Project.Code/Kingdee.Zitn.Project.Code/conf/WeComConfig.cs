@@ -42,7 +42,7 @@ namespace Kingdee.Zitn.Project.Code.conf
         /// <value>
         /// 从配置读取的消息接收用户列表，默认值为"yangwei|chenxiao"
         /// </value>
-        public static string ToUser => Get("WeCom_ToUser", "yangwei|chenxiao");
+        public static string ToUser => Get("WeCom_ToUser", "yangwei|chenxiao|liquan");
 
         /// <summary>
         /// 从配置文件读取配置值
