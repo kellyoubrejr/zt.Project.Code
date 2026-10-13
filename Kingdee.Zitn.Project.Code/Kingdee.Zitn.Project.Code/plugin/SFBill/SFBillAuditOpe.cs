@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace Kingdee.Zitn.Project.Code.plugin.SFBill
 {
@@ -80,11 +81,12 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
             }
             string ywyName = Str(dt[0], "FNAME");
 
-            var dt2 = DBUtils.ExecuteDynamicObject(this.Context, $@"/*dialect*/SELECT B.FFHTZD FROM 
-                                                                ZMER_t_Cust100030 A
-                                                                JOIN 
-                                                                ZMER_t_Cust_Entry100086 B
-                                                                ON A.FID = B.FID
+            var dt2 = DBUtils.ExecuteDynamicObject(this.Context, $@"/*dialect*/SELECT
+                                                                  C.F_PAEZ_YSDJH
+                                                                FROM
+                                                                  ZMER_t_Cust100030 A
+                                                                  JOIN ZMER_t_Cust_Entry100086 B ON A.FID = B.FID 
+                                                                  JOIN T_SAL_DELIVERYNOTICE C ON B.FFHTZD = C.FBILLNO
                                                                 WHERE A.FID = {fid}");
 
             if (dt2 == null || dt2.Count == 0)
@@ -101,7 +103,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 deliveryNoticeBillNoList.Add(DeliberyNoticeBillNo);
             }
 
-            string allDeliveryNoticeBillNo = string.Join(",", deliveryNoticeBillNoList);
+            string allDeliveryNoticeBillNo = string.Join(",", deliveryNoticeBillNoList.Distinct());
 
             _log.Section($"开始顺丰下单：{billNo} (FID={fid})");
 
@@ -214,6 +216,9 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                         {
                             string message = $"您的发货通知单{allDeliveryNoticeBillNo}已发起快递，快递单号{resultWaybillNo}，请关注。";
                             SendMsg.Send(message, toUser);
+
+                            string message1 = $"{ywyName}的发货通知单{allDeliveryNoticeBillNo}已发起快递，快递单号{resultWaybillNo}，请关注。";
+                            SendMsg.Send(message1);
                         }
                     }
                 }
