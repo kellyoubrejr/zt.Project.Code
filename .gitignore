@@ -4,6 +4,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+*.csproj
 
 # 编译输出
 bin/
