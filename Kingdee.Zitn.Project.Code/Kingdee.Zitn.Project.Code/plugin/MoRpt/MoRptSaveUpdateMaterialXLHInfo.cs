@@ -37,7 +37,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.MoRpt
                     {
                         string F_ISDSJ = Convert.ToString(serialEntry["F_ISDSJ"]);
                         string SerialId = Convert.ToString(serialEntry["SerialId_Id"]);
-                        string updateSerialSql = string.Format("update T_BD_SERIALMASTER set F_SCLOTNO='{1}',F_XM='{2}',F_ISDSJ='{3}' where FSERIALID='{0}'", SerialId, FSCLOTNO, F_XM, F_ISDSJ);
+                        string updateSerialSql = string.Format("update T_BD_SERIALMASTER set FSCLOTNO='{1}',F_XM='{2}',F_ISDSJ='{3}' where FSERIALID='{0}'", SerialId, FSCLOTNO, F_XM, F_ISDSJ);
                         DBServiceHelper.ExecuteDynamicObject(this.Context, updateSerialSql);
                     }
                 }
