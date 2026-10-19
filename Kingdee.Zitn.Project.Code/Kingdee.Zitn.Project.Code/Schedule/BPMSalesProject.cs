@@ -139,6 +139,7 @@ namespace Kingdee.Zitn.Project.Code.Schedule
                 {
                     SendMsg.Send($"[BPM销售项目同步] {summary}");
                 }
+                var finallySql = DBUtils.Execute(ctx, $"/*dialect*/ UPDATE {TABLE_NAME} SET FNUMBER = FCRMID WHERE FNUMBER <> FCRMID");
             }
             catch (Exception ex)
             {
