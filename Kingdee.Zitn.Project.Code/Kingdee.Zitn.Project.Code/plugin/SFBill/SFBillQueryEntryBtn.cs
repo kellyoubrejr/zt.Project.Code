@@ -21,9 +21,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
     {
         private static readonly CustomLog.LogWriter _log = CustomLog.For("物流面单查询");
 
-        private const string HEAD_TABLE = "ZMER_t_Cust100030";       // 单据头
-        private const string ROUTE_TABLE = "ZMER_t_Cust_Entry100084"; // 路由轨迹单据体
-        private const string FEE_TABLE = "ZMER_t_Cust_Entry100087";   // 费用单据体
         private const string BW_TABLE = "ZMER_t_Cust_Entry100085";    // 报文单据体
 
         private const string ROUTE_ENTITY = "F_ZMER_Entity_LYGJ";
@@ -115,7 +112,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 return;
             }
 
-            // 1. 先走 SetValue 写界面
+            // 只写内存模型，由用户点「保存」时框架统一落库
             try
             {
                 WriteRoutesToModel(routes);
@@ -126,12 +123,11 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 _log.Error("模型写入路由失败");
                 _log.Error(ex);
                 SendMsg.Send("【物流面单】路由写入界面失败", ex);
+                this.View.ShowErrMessage("路由写入界面失败：" + ex.Message);
+                return;
             }
 
-            // 2. 再用 SQL 写库兜底
-            WriteRoutesToSql(fid, routes);
-
-            this.View.ShowMessage($"路由查询成功，共 {routes.Count} 条轨迹");
+            this.View.ShowMessage($"路由查询成功，共 {routes.Count} 条轨迹，请保存单据");
         }
 
         /// <summary>手动查询费用（EXP_RECE_QUERY_SFWAYBILL）</summary>
@@ -168,26 +164,32 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 return;
             }
 
-            // 1. 先走 SetValue 写界面
+            // 只写内存模型，由用户点「保存」时框架统一落库
             try
             {
                 WriteFreightToModel(feeList);
                 this.View.UpdateView(FEE_ENTITY);
+
+                // 回写单据头运费总额（走模型，随保存落库）
+                decimal total = 0;
+                foreach (var fee in feeList)
+                {
+                    decimal v = 0;
+                    decimal.TryParse(fee["value"]?.ToString(), out v);
+                    total += v;
+                }
+                this.Model.SetValue("FFreightTotal", total);
             }
             catch (Exception ex)
             {
                 _log.Error("模型写入费用失败");
                 _log.Error(ex);
                 SendMsg.Send("【物流面单】费用写入界面失败", ex);
+                this.View.ShowErrMessage("费用写入界面失败：" + ex.Message);
+                return;
             }
 
-            // 2. 再用 SQL 写库兜底
-            WriteFreightToSql(fid, feeList);
-
-            // 3. 回写单据头运费总额
-            UpdateFreightTotal(fid, feeList);
-
-            this.View.ShowMessage($"费用查询成功，共 {feeList.Count} 条费用");
+            this.View.ShowMessage($"费用查询成功，共 {feeList.Count} 条费用，请保存单据");
         }
 
         /// <summary>手动注册图片（EXP_RECE_REGISTER_WAYBILL_PICTURE）</summary>
@@ -434,65 +436,6 @@ namespace Kingdee.Zitn.Project.Code.plugin.SFBill
                 this.Model.SetValue("FFeeName", "自动" + Str(fee["name"]), i);
                 this.Model.SetValue("FFeeValue", feeValue, i);
                 this.Model.SetValue("FSettlementType", SettlementTypeName(Str(fee["settlementTypeCode"])), i);
-            }
-        }
-
-        /// <summary>SQL 兜底写入路由</summary>
-        private void WriteRoutesToSql(long fid, JArray routes)
-        {
-            DBUtils.Execute(this.Context, $"/*dialect*/DELETE FROM {ROUTE_TABLE} WHERE FID = {fid}");
-
-            foreach (var r in routes)
-            {
-                long entryId = NextEntryId(ROUTE_TABLE);
-                var sql = $@"/*dialect*/INSERT INTO {ROUTE_TABLE}
-                        (FENTRYID, FID, FAcceptTime1, FAcceptAddress, FRemark, FOpCode, FStatusName)
-                    VALUES
-                        ({entryId}, {fid}, '{Sql(Str(r["acceptTime"]))}', '{Sql(Str(r["acceptAddress"]))}', '{Sql(Str(r["remark"]))}', '{Sql(Str(r["opCode"]))}', '{Sql(StatusName(r))}')";
-                DBUtils.Execute(this.Context, sql);
-            }
-        }
-
-        /// <summary>SQL 兜底写入费用</summary>
-        private void WriteFreightToSql(long fid, JArray feeList)
-        {
-            DBUtils.Execute(this.Context, $"/*dialect*/DELETE FROM {FEE_TABLE} WHERE FID = {fid}");
-
-            foreach (var fee in feeList)
-            {
-                decimal feeValue = 0;
-                decimal.TryParse(fee["value"]?.ToString(), out feeValue);
-
-                long entryId = NextEntryId(FEE_TABLE);
-                var sql = $@"/*dialect*/INSERT INTO {FEE_TABLE}
-                        (FENTRYID, FID, FFeeType, FFeeName, FFeeValue, FSettlementType)
-                    VALUES
-                        ({entryId}, {fid}, '{Sql(FeeTypeName(Str(fee["type"])))}', '{Sql("自动" + Str(fee["name"]))}', {feeValue.ToString(CultureInfo.InvariantCulture)}, '{Sql(SettlementTypeName(Str(fee["settlementTypeCode"])))}')";
-                DBUtils.Execute(this.Context, sql);
-            }
-        }
-
-        /// <summary>回写单据头运费总额（FFreightTotal）</summary>
-        private void UpdateFreightTotal(long fid, JArray feeList)
-        {
-            decimal total = 0;
-            foreach (var fee in feeList)
-            {
-                decimal v = 0;
-                decimal.TryParse(fee["value"]?.ToString(), out v);
-                total += v;
-            }
-
-            try
-            {
-                DBUtils.Execute(this.Context,
-                    $@"/*dialect*/UPDATE {HEAD_TABLE} SET FFreightTotal = {total.ToString(CultureInfo.InvariantCulture)} WHERE FID = {fid}");
-            }
-            catch (Exception ex)
-            {
-                _log.Error($"回写运费总额失败，FID={fid}");
-                _log.Error(ex);
-                SendMsg.Send($"【物流面单】回写运费总额失败，FID={fid}", ex);
             }
         }
 
