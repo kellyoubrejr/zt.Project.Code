@@ -177,6 +177,8 @@
     <Compile Include="plugin\MRP\MRP_PlnForceCastSaveToPlanOrderOpe.cs" />
     <Compile Include="plugin\MRP\MRP_SalOrderSaveToPlanOrderForm.cs" />
     <Compile Include="plugin\MRP\MRP_SalOrderSaveToPlanOrderOpe.cs" />
+    <Compile Include="plugin\MSPO\MSPOAuditUpsertColorFlag.cs" />
+    <Compile Include="plugin\MSPO\MSPOSelectLookUp.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSMVaildate.cs" />
     <Compile Include="plugin\OutStock\OutStockAuditSuanBox.cs" />
     <Compile Include="plugin\OutStock\OutStockEntryButtonSuanBox.cs" />
