@@ -62,8 +62,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.MSPO
                 MultiSelect = true,
             };
             showParam.OpenStyle.ShowType = ShowType.Modal;
-            
-            showParam.ListFilterParameter.Filter = "FDocumentStatus = 'C'";
+
+            showParam.ListFilterParameter.Filter = "FDocumentStatus IN ('B','C')";
 
             this.View.ShowForm(showParam, new Action<FormResult>((results) =>
             {
@@ -93,7 +93,7 @@ namespace Kingdee.Zitn.Project.Code.plugin.MSPO
                             JOIN T_BD_SUPPLIER_L S ON A.FSUPPLIERID = S.FSUPPLIERID AND S.FLOCALEID = 2052
                             JOIN T_BD_MATERIAL M ON B.FMATERIALID = M.FMATERIALID
                             JOIN T_BD_UNIT_L U ON B.FUNITID = U.FUNITID
-                            WHERE A.FDOCUMENTSTATUS = 'C'
+                            WHERE A.FDOCUMENTSTATUS IN ('B','C')
                               AND B.FENTRYID IN ({fEntryIds})
                             ORDER BY A.FBILLNO, B.FSEQ";
 
@@ -127,7 +127,8 @@ namespace Kingdee.Zitn.Project.Code.plugin.MSPO
                 this.View.Model.SetValue(FIELD_SUPPLIER, Convert.ToString(rows[i]["FSUPPLIER"]), newRow);
                 this.View.Model.SetValue(FIELD_MATERIAL, materialObj, newRow);
                 this.View.Model.SetValue(FIELD_QTY, Convert.ToString(rows[i]["FQTY"]), newRow);
-                this.View.Model.SetValue(FIELD_TAXPRICE, Convert.ToString(rows[i]["FTAXPRICE"]), newRow);
+                //this.View.Model.SetValue(FIELD_TAXPRICE, Convert.ToString(rows[i]["FTAXPRICE"]), newRow);
+                this.View.Model.SetValue(FIELD_TAXPRICE, Convert.ToDecimal(rows[i]["FTAXPRICE"]).ToString("F2"), newRow);
                 this.View.Model.SetValue(FIELD_DANWEI, Convert.ToString(rows[i]["FDANWEI"]), newRow);
             }
 
