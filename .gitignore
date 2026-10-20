@@ -1,4 +1,13 @@
-﻿# Visual Studio 本地设置
+﻿# 本地/临时目录
+Win/
+SFMiddleService/
+packages/
+.history/
+.workbuddy/
+.vscode/
+.claude/
+
+# Visual Studio 本地设置
 .vs/
 *.suo
 *.user
@@ -22,6 +31,3 @@ Release/
 # 系统文件
 Thumbs.db
 Desktop.ini
-
-# VS Code 本地历史记录（新增）
-.history/
