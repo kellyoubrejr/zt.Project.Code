@@ -1,6 +1,7 @@
 ﻿using Kingdee.BOS.App.Data;
 using Kingdee.BOS.Core.DynamicForm.PlugIn;
 using Kingdee.BOS.Core.DynamicForm.PlugIn.Args;
+using Kingdee.BOS.Orm.DataEntity;
 using Kingdee.BOS.Util;
 using System;
 using System.ComponentModel;
@@ -13,6 +14,19 @@ namespace Kingdee.Zitn.Project.Code.plugin.MSPO
     [HotUpdate, Description("【免审采购订单审核服务】遍历单据体根据PO、GYS、WL更新颜色标志")]
     public class MSPOAuditUpsertColorFlag : AbstractOperationServicePlugIn
     {
+
+        public override void OnPreparePropertys(PreparePropertysEventArgs e)
+        {
+            base.OnPreparePropertys(e);
+            e.FieldKeys.Add("FPURNO");
+            e.FieldKeys.Add("FSUPPLIER");
+            e.FieldKeys.Add("FMATERIALID");
+            e.FieldKeys.Add("FMATERIALID_Id");
+            e.FieldKeys.Add("F_ZMER_TEXT_83G");
+            e.FieldKeys.Add("F_ZMER_TEXT_QTR");
+            e.FieldKeys.Add("FTAXPRICE");
+        }
+
         // 日志目录：D盘下的“采购面审日志”文件夹，按天拆分日志文件
         private const string LogDirectory = @"D:\采购面审日志";
         // 写日志锁，避免并发审核/多线程同时写同一个日志文件
@@ -28,14 +42,37 @@ namespace Kingdee.Zitn.Project.Code.plugin.MSPO
                 foreach (var billObj in e.DataEntitys)
                 {
                     billIndex++;
+
+                    var entrys = billObj["ZMER_Cust_Entry100101"] as DynamicObjectCollection;
+
                     string tag = $"[单据{billIndex}]";
-                    string billNo = Convert.ToString(billObj["FPURNO"]);
-                    string GYS = Convert.ToString(billObj["FSUPPLIER"]);
-                    string FMATERIAL = Convert.ToString(billObj["FMATERIAL"]);
-                    string XIAXIAN = Convert.ToString(billObj["F_ZMER_TEXT_83G"]);
-                    string SHANGXIAN = Convert.ToString(billObj["F_ZMER_TEXT_QTR"]);
-                    string HANSHUIDANJIA = Convert.ToString(billObj["FTAXPRICE"]);
-                    WriteLog($"{tag} 免审配置 - PO号: '{billNo}', 供应商: '{GYS}', 物料: '{FMATERIAL}', 下限: '{XIAXIAN}', 上限: '{SHANGXIAN}', 免审含税单价: '{HANSHUIDANJIA}'");
+                    //string billNo = Convert.ToString(billObj["FPURNO"]);
+                    //string GYS = Convert.ToString(billObj["FSUPPLIER"]);
+                    //string FMATERIAL = Convert.ToString(billObj["FMATERIAL"]);
+                    //string XIAXIAN = Convert.ToString(billObj["F_ZMER_TEXT_83G"]);
+                    //string SHANGXIAN = Convert.ToString(billObj["F_ZMER_TEXT_QTR"]);
+                    //string HANSHUIDANJIA = Convert.ToString(billObj["FTAXPRICE"]);
+                    //WriteLog($"{tag} 免审配置 - PO号: '{billNo}', 供应商: '{GYS}', 物料: '{FMATERIAL}', 下限: '{XIAXIAN}', 上限: '{SHANGXIAN}', 免审含税单价: '{HANSHUIDANJIA}'");
+
+                    string billNo = string.Empty;
+                    string GYS = string.Empty;
+                    string FMATERIAL = string.Empty;
+                    string XIAXIAN = string.Empty;
+                    string SHANGXIAN = string.Empty;
+                    string HANSHUIDANJIA = string.Empty;
+
+                    foreach (var entry in entrys)
+                    {
+                         billNo = Convert.ToString(entry["FPURNO"]);
+                         GYS = Convert.ToString(entry["FSUPPLIER"]);
+                         FMATERIAL = Convert.ToString(entry["FMATERIALID_Id"]);
+                         XIAXIAN = Convert.ToString(entry["F_ZMER_TEXT_83G"]);
+                         SHANGXIAN = Convert.ToString(entry["F_ZMER_TEXT_QTR"]);
+                         HANSHUIDANJIA = Convert.ToString(entry["FTAXPRICE"]);
+
+                        WriteLog($"分录行 - PO号: '{billNo}', 供应商: '{GYS}', 物料: '{FMATERIAL}', 下限: '{XIAXIAN}', 上限: '{SHANGXIAN}', 免审含税单价: '{HANSHUIDANJIA}'");
+                    }
+
 
                     // 单据编号有效条件：CGDD开头 + 后面全是数字；为空或纯文字均视为无有效编号
                     bool hasValidBillNo = !string.IsNullOrWhiteSpace(billNo) && Regex.IsMatch(billNo, @"^CGDD\d+$");
